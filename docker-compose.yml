@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: digital-deck-postgres
+    environment:
+      POSTGRES_USER: deckuser
+      POSTGRES_PASSWORD: deckpass
+      POSTGRES_DB: digitaldeck
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: digital-deck-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres-data:
