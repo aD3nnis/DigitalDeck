@@ -1,20 +1,45 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Client } from "@stomp/stompjs";
 
 export default function Home() {
-  const [status, setStatus] = useState<string>("loading...");
+  const [messages, setMessages] = useState<string[]>([]);
+  const [client, setClient] = useState<Client | null>(null);
 
   useEffect(() => {
-    fetch("http://localhost:8080/api/ping")
-      .then((res) => res.json())
-      .then((data) => setStatus(data.status))
-      .catch(() => setStatus("error — could not reach backend"));
+    const stompClient = new Client({
+      brokerURL: "ws://localhost:8080/ws",
+      onConnect: () => {
+        stompClient.subscribe("/topic/test", (message) => {
+          setMessages((prev) => [...prev, message.body]);
+        });
+      },
+    });
+
+    stompClient.activate();
+    setClient(stompClient);
+
+    return () => {
+      stompClient.deactivate();
+    };
   }, []);
+
+  const sendTestMessage = () => {
+    client?.publish({
+      destination: "/app/test",
+      body: JSON.stringify({ message: "hello from the browser" }),
+    });
+  };
 
   return (
     <main>
-      <h1>Backend status: {status}</h1>
+      <button onClick={sendTestMessage}>Send test message</button>
+      <ul>
+        {messages.map((msg, i) => (
+          <li key={i}>{msg}</li>
+        ))}
+      </ul>
     </main>
   );
 }

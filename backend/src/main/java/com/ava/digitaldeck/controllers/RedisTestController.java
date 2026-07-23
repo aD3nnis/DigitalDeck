@@ -1,4 +1,4 @@
-package com.ava.digitaldeck;
+package com.ava.digitaldeck.controllers;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
