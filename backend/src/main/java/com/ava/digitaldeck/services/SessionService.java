@@ -50,4 +50,14 @@ public class SessionService {
         } while (redisTemplate.hasKey("code:" + code));
         return code;
     }
+    
+    public boolean sessionExists(String sessionId) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey("session:" + sessionId + ":meta"));
+    }
+    
+    public void addPlayer(String sessionId, String playerId, String displayName) {
+        String playersKey = "session:" + sessionId + ":players";
+        redisTemplate.opsForHash().put(playersKey, playerId, displayName);
+        redisTemplate.expire(playersKey, SESSION_TTL);
+    }
 }
