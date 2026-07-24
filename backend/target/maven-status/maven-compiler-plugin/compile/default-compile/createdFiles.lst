@@ -1,6 +1,5 @@
 com/ava/digitaldeck/controllers/PingController.class
 com/ava/digitaldeck/services/SessionService.class
 com/ava/digitaldeck/DigitaldeckApplication.class
-com/ava/digitaldeck/config/WebSocketConfig.class
 com/ava/digitaldeck/controllers/RedisTestController.class
 com/ava/digitaldeck/controllers/SessionController.class

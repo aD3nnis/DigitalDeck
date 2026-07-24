@@ -70,4 +70,8 @@ public class SessionService {
         raw.forEach((k, v) -> players.put(k.toString(), v.toString()));
         return players;
     }
+    public void removePlayer(String sessionId, String playerId) {
+        String playersKey = "session:" + sessionId + ":players";
+        redisTemplate.opsForHash().delete(playersKey, playerId);
+    }
 }

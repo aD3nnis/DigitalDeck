@@ -80,6 +80,19 @@ export default function Home() {
     subscribeAndJoin(resolvedId, client);
   };
 
+  const leaveSession = () => {
+    if (!client || !sessionId) return;
+  
+    client.publish({
+      destination: `/app/session/${sessionId}/leave`,
+      body: JSON.stringify({ playerId }),
+    });
+  
+    setSessionId(null);
+    setRoster({});
+    setMessages([]);
+  };
+
   return (
     <main>
       <section>
@@ -112,6 +125,9 @@ export default function Home() {
           </li>
         ))}
       </ul>
+      {sessionId && (
+        <button onClick={leaveSession}>Leave session</button>
+      )}
     </main>
   );
 }
