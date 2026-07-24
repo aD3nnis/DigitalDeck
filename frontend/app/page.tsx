@@ -9,6 +9,8 @@ export default function Home() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [joinCodeInput, setJoinCodeInput] = useState("");
+  const [roster, setRoster] = useState<Record<string, string>>({});
+  const [displayName, setDisplayName] = useState("");
 
   useEffect(() => {
     const stompClient = new Client({
@@ -26,17 +28,21 @@ export default function Home() {
   }, []);
 
   const [playerId] = useState(() => crypto.randomUUID()); // once per tab, not per click
-  
+
   const subscribeAndJoin = (resolvedSessionId: string, stompClient: Client) => {
     if (sessionId === resolvedSessionId) return; // already in this session, don't resubscribe
   
-    stompClient.subscribe(`/topic/session/${resolvedSessionId}`, (message) => {
+  stompClient.subscribe(`/topic/session/${resolvedSessionId}`, (message) => {
+    const event = JSON.parse(message.body);
+    if (event.type === "ROSTER") {
+      setRoster(event.payload); // { playerId: displayName, ... }
+    } else {
       setMessages((prev) => [...prev, message.body]);
-    });
-  
+    }
+  });
     stompClient.publish({
       destination: `/app/session/${resolvedSessionId}/join`,
-      body: JSON.stringify({ playerId, displayName: "Ava" }),
+      body: JSON.stringify({ playerId, displayName }),
     });
   };
 
@@ -85,6 +91,11 @@ export default function Home() {
 
       <section>
         <input
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          placeholder="Your name"
+        />
+        <input
           value={joinCodeInput}
           onChange={(e) => setJoinCodeInput(e.target.value)}
           placeholder="Enter code"
@@ -93,10 +104,12 @@ export default function Home() {
           Join session
         </button>
       </section>
-
+      <h2>Players in session</h2>
       <ul>
-        {messages.map((msg, i) => (
-          <li key={i}>{msg}</li>
+        {Object.entries(roster).map(([playerId, displayName]) => (
+          <li key={playerId}>
+            {displayName} <small>({playerId})</small>
+          </li>
         ))}
       </ul>
     </main>

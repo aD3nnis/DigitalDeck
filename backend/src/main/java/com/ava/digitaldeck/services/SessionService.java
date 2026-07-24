@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.UUID;
 
 @Service
@@ -15,6 +17,7 @@ public class SessionService {
     private static final String CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
     private static final int CODE_LENGTH = 5;
     private static final Duration SESSION_TTL = Duration.ofHours(4);
+    
 
     private final StringRedisTemplate redisTemplate;
     private final SecureRandom random = new SecureRandom();
@@ -59,5 +62,12 @@ public class SessionService {
         String playersKey = "session:" + sessionId + ":players";
         redisTemplate.opsForHash().put(playersKey, playerId, displayName);
         redisTemplate.expire(playersKey, SESSION_TTL);
+    }
+    public Map<String, String> getPlayers(String sessionId) {
+        String playersKey = "session:" + sessionId + ":players";
+        Map<Object, Object> raw = redisTemplate.opsForHash().entries(playersKey);
+        Map<String, String> players = new HashMap<>();
+        raw.forEach((k, v) -> players.put(k.toString(), v.toString()));
+        return players;
     }
 }

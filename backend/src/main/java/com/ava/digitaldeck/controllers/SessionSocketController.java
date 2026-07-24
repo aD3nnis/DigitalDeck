@@ -26,17 +26,23 @@ public class SessionSocketController {
     @MessageMapping("/session/{sessionId}/join")
     public void join(@DestinationVariable String sessionId, JoinRequest request) {
         if (!sessionService.sessionExists(sessionId)) {
-            return; // silently ignore for now — real error handling comes later
+            return;
         }
-
+    
         sessionService.addPlayer(sessionId, request.playerId(), request.displayName());
-
-        SessionEvent event = new SessionEvent(
+    
+        SessionEvent joinEvent = new SessionEvent(
                 "PLAYER_JOINED",
                 sessionId,
                 Map.of("playerId", request.playerId(), "displayName", request.displayName())
         );
-
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId, event);
+        messagingTemplate.convertAndSend("/topic/session/" + sessionId, joinEvent);
+    
+        SessionEvent rosterEvent = new SessionEvent(
+                "ROSTER",
+                sessionId,
+                sessionService.getPlayers(sessionId)
+        );
+        messagingTemplate.convertAndSend("/topic/session/" + sessionId, rosterEvent);
     }
 }
