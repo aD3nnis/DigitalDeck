@@ -170,6 +170,13 @@ export default function Home() {
     setSessionId(null);
     setRoster({});
     setMessages([]);
+    setGameStarted(false);
+    setCurrentTurn(null);
+    setHostId(null);
+    setHand([]);
+    setRemaining(null);
+    setCode(null); // optional — hides the old session code too
+  
     sessionStorage.removeItem("digitalDeck.sessionId");
     sessionStorage.removeItem("digitalDeck.displayName");
   };
