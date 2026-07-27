@@ -315,3 +315,32 @@ Then confirm with `git status` that it no longer shows as deleted, and re-run `.
 Worth noting for next time: this is exactly the kind of thing regular small commits protect you from — if `WebSocketConfig.java` had been committed right after you built it (which, per your own good habit earlier, it likely was), `git restore` recovering it cleanly like this is the payoff of that habit, not a coincidence.
 
 One thing worth double-checking once it's running again: make sure `WebSocketEventListener` wasn't *also* modified or duplicated during whatever caused this — Cursor's message specifically says "don't replace `WebSocketEventListener`, you need both," which suggests something in that editing session was proposing to swap one for the other rather than keep both. Take a quick look at both files once the app starts cleanly, just to confirm `WebSocketEventListener` still has the full disconnect-handling logic from what we built, and `WebSocketConfig` still has the original `enableSimpleBroker`/`/app` prefix/`/ws` endpoint setup — not a stripped-down or merged version of either.
+
+---
+## me
+are both @backend/src/main/java/com/ava/digitaldeck/config/WebSocketConfig.java and @backend/src/main/java/com/ava/digitaldeck/config/WebSocketEventListener.java used for different purposes in this project?
+
+---
+## Claude
+Yes — they do different jobs and you need both.
+
+**`WebSocketConfig`** — setup / wiring  
+It turns on STOMP over WebSocket and defines how clients talk to the server:
+
+- Endpoint: `/ws` (what the frontend connects to)
+- App destinations: `/app/...` (client → server messages)
+- Broker: `/topic/...` (server → client pub/sub)
+- Allowed origin: `http://localhost:3000`
+
+Without this, Spring never enables the message broker, so things like `SimpMessagingTemplate` don’t get created.
+
+**`WebSocketEventListener`** — runtime disconnect handling  
+It reacts when a WebSocket connection drops (`SessionDisconnectEvent`):
+
+1. Look up the player via `ConnectionRegistry`
+2. Remove them from the session
+3. Broadcast `PLAYER_LEFT` and an updated `ROSTER`
+
+That covers tab close, crash, wifi drop, etc. — not just an explicit leave message.
+
+So: **Config = “how WebSockets work.” Listener = “what to do when someone disconnects.”** They’re complementary, not alternatives.
