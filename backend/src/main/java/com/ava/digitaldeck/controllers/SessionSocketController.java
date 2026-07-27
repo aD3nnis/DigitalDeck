@@ -6,6 +6,7 @@ import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.services.SessionService;
 import com.ava.digitaldeck.services.TurnService;
 import com.ava.digitaldeck.services.DeckService;
+import com.ava.digitaldeck.services.DisconnectGraceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -25,18 +26,20 @@ public class SessionSocketController {
     private final ConnectionRegistry connectionRegistry;
     private final TurnService turnService;
     private final DeckService deckService;
-
+    private final DisconnectGraceService disconnectGraceService;
     @Autowired
     public SessionSocketController(SessionService sessionService,
                                    SimpMessagingTemplate messagingTemplate,
                                    ConnectionRegistry connectionRegistry,
                                    TurnService turnService,
-                                   DeckService deckService) {
+                                   DeckService deckService,
+                                   DisconnectGraceService disconnectGraceService) {
         this.sessionService = sessionService;
         this.messagingTemplate = messagingTemplate;
         this.connectionRegistry = connectionRegistry;
         this.turnService = turnService;
         this.deckService = deckService;
+        this.disconnectGraceService = disconnectGraceService;
     }
 
     @MessageMapping("/session/{sessionId}/join")
@@ -48,16 +51,18 @@ public class SessionSocketController {
         
         String webSocketSessionId = headerAccessor.getSessionId();
         connectionRegistry.register(webSocketSessionId, sessionId, request.playerId());
-        
+
+        boolean wasPending = disconnectGraceService.cancel(sessionId, request.playerId());
         sessionService.addPlayer(sessionId, request.playerId(), request.displayName());
     
-        SessionEvent joinEvent = new SessionEvent(
-                "PLAYER_JOINED",
-                sessionId,
-                Map.of("playerId", request.playerId(), "displayName", request.displayName())
-        );
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId, joinEvent);
-    
+        if (!wasPending) {
+            SessionEvent joinEvent = new SessionEvent(
+                    "PLAYER_JOINED",
+                    sessionId,
+                    Map.of("playerId", request.playerId(), "displayName", request.displayName())
+            );
+            messagingTemplate.convertAndSend("/topic/session/" + sessionId, joinEvent);
+        }
         SessionEvent rosterEvent = new SessionEvent(
                 "ROSTER",
                 sessionId,
@@ -84,32 +89,6 @@ public class SessionSocketController {
     public void leave(@DestinationVariable String sessionId, LeaveRequest request) {
         if (!sessionService.sessionExists(sessionId)) return;
     
-        String nextPlayer = turnService.handlePlayerLeft(sessionId, request.playerId()).orElse(null);
-        
-        sessionService.removePlayer(sessionId, request.playerId());
-    
-        SessionEvent leaveEvent = new SessionEvent(
-                "PLAYER_LEFT",
-                sessionId,
-                Map.of("playerId", request.playerId())
-        );
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId, leaveEvent);
-    
-        SessionEvent rosterEvent = new SessionEvent(
-                "ROSTER",
-                sessionId,
-                sessionService.getPlayers(sessionId)
-        );
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId, rosterEvent);
-    
-        Map<String, String> turnPayload = new HashMap<>();
-        turnPayload.put("playerId", nextPlayer);
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                new SessionEvent("TURN_CHANGED", sessionId, turnPayload));
-
-        Map<String, String> hostPayload = new HashMap<>();
-        hostPayload.put("playerId", sessionService.getHost(sessionId).orElse(null));
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                new SessionEvent("HOST_CHANGED", sessionId, hostPayload));
+        disconnectGraceService.leaveNow(sessionId, request.playerId());
     }
 }

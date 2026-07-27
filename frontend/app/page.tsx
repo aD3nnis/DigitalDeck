@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Client } from "@stomp/stompjs";
 
+
 export default function Home() {
   const [messages, setMessages] = useState<string[]>([]);
   const [client, setClient] = useState<Client | null>(null);
@@ -10,29 +11,48 @@ export default function Home() {
   const [code, setCode] = useState<string | null>(null);
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const [roster, setRoster] = useState<Record<string, string>>({});
-  const [displayName, setDisplayName] = useState("");
   const [currentTurn, setCurrentTurn] = useState<string | null>(null);
   const [hostId, setHostId] = useState<string | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [hand, setHand] = useState<string[]>([]);
   const [remaining, setRemaining] = useState<number | null>(null);
 
+  const [displayName, setDisplayName] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return sessionStorage.getItem("digitalDeck.displayName") ?? "";
+  });
+  
+  const [playerId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const stored = sessionStorage.getItem("digitalDeck.playerId");
+    if (stored) return stored;
+    const newId = crypto.randomUUID();
+    sessionStorage.setItem("digitalDeck.playerId", newId);
+    return newId;
+  });
+  
   useEffect(() => {
     const stompClient = new Client({
       brokerURL: "ws://localhost:8080/ws",
       onConnect: () => {
         setClient(stompClient);
+  
+        const savedSessionId = sessionStorage.getItem("digitalDeck.sessionId");
+        const savedName = sessionStorage.getItem("digitalDeck.displayName");
+        if (savedSessionId && savedName) {
+          setDisplayName(savedName);
+          setSessionId(savedSessionId);
+          subscribeAndJoin(savedSessionId, stompClient);
+          rehydrateHand(savedSessionId);
+        }
       },
     });
-
+  
     stompClient.activate();
-
     return () => {
       stompClient.deactivate();
     };
   }, []);
-
-  const [playerId] = useState(() => crypto.randomUUID()); // once per tab, not per click
 
   const subscribeAndJoin = (resolvedSessionId: string, stompClient: Client) => {
     if (sessionId === resolvedSessionId) return; // already in this session, don't resubscribe
@@ -66,7 +86,7 @@ export default function Home() {
   };
 
   const createAndJoin = async () => {
-    if (!client) return;
+    if (!client || !playerId) return;
 
     const createRes = await fetch("http://localhost:8080/api/sessions", {
       method: "POST",
@@ -79,12 +99,15 @@ export default function Home() {
     );
     const { sessionId: resolvedId } = await resolveRes.json();
     setSessionId(resolvedId);
+    sessionStorage.setItem("digitalDeck.sessionId", resolvedId);
+    sessionStorage.setItem("digitalDeck.displayName", displayName);
+    
 
     subscribeAndJoin(resolvedId, client);
   };
 
   const joinExisting = async () => {
-    if (!client || !joinCodeInput) return;
+    if (!client || !joinCodeInput || !playerId) return;
 
     const resolveRes = await fetch(
       `http://localhost:8080/api/sessions/${joinCodeInput}`
@@ -95,7 +118,10 @@ export default function Home() {
     }
     const { sessionId: resolvedId } = await resolveRes.json();
     setSessionId(resolvedId);
-
+    
+    sessionStorage.setItem("digitalDeck.sessionId", resolvedId);
+    sessionStorage.setItem("digitalDeck.displayName", displayName);
+    
     subscribeAndJoin(resolvedId, client);
   };
 
@@ -126,6 +152,13 @@ export default function Home() {
     setHand((prev) => [...prev, card]);
   };
 
+  const rehydrateHand = async (resolvedSessionId: string) => {
+    const res = await fetch(`http://localhost:8080/api/sessions/${resolvedSessionId}/hand?playerId=${playerId}`);
+    if (!res.ok) return;
+    const { hand: savedHand } = await res.json();
+    setHand(savedHand);
+  };
+
   const leaveSession = () => {
     if (!client || !sessionId) return;
   
@@ -137,6 +170,8 @@ export default function Home() {
     setSessionId(null);
     setRoster({});
     setMessages([]);
+    sessionStorage.removeItem("digitalDeck.sessionId");
+    sessionStorage.removeItem("digitalDeck.displayName");
   };
 
   return (

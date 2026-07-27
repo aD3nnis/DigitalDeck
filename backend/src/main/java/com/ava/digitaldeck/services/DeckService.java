@@ -54,4 +54,8 @@ public class DeckService {
         Long size = redisTemplate.opsForList().size("session:" + sessionId + ":deck");
         return size == null ? 0 : size;
     }
+    public List<String> getHand(String sessionId, String playerId) {
+        List<String> hand = redisTemplate.opsForList().range("session:" + sessionId + ":hands:" + playerId, 0, -1);
+        return hand == null ? List.of() : hand;
+    }
 }

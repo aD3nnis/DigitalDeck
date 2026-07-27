@@ -92,4 +92,9 @@ public class SessionController {
 
         return ResponseEntity.ok(Map.of("card", card.get()));
     }    
+    @GetMapping("/{sessionId}/hand")
+    public ResponseEntity<?> getHand(@PathVariable String sessionId, @RequestParam String playerId) {
+        if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(Map.of("hand", deckService.getHand(sessionId, playerId)));
+    }
 }
