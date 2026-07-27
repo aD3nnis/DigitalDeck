@@ -5,8 +5,11 @@
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/controllers/RedisTestController.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/controllers/SessionController.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/controllers/SessionSocketController.java
+/Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/model/DrawRequest.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/model/JoinRequest.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/model/LeaveRequest.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/model/SessionEvent.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/ConnectionRegistry.java
+/Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/DeckService.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/SessionService.java
+/Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/TurnService.java
