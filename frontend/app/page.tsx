@@ -11,6 +11,7 @@ export default function Home() {
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const [roster, setRoster] = useState<Record<string, string>>({});
   const [displayName, setDisplayName] = useState("");
+  const [currentTurn, setCurrentTurn] = useState<string | null>(null);
 
   useEffect(() => {
     const stompClient = new Client({
@@ -32,14 +33,17 @@ export default function Home() {
   const subscribeAndJoin = (resolvedSessionId: string, stompClient: Client) => {
     if (sessionId === resolvedSessionId) return; // already in this session, don't resubscribe
   
-  stompClient.subscribe(`/topic/session/${resolvedSessionId}`, (message) => {
-    const event = JSON.parse(message.body);
-    if (event.type === "ROSTER") {
-      setRoster(event.payload); // { playerId: displayName, ... }
-    } else {
-      setMessages((prev) => [...prev, message.body]);
-    }
-  });
+    stompClient.subscribe(`/topic/session/${resolvedSessionId}`, (message) => {
+      const event = JSON.parse(message.body);
+      if (event.type === "ROSTER") {
+        setRoster(event.payload);
+      } else if (event.type === "TURN_CHANGED") {
+        setCurrentTurn(event.payload.playerId);
+      } else {
+        setMessages((prev) => [...prev, message.body]);
+      }
+    });
+
     stompClient.publish({
       destination: `/app/session/${resolvedSessionId}/join`,
       body: JSON.stringify({ playerId, displayName }),
@@ -125,6 +129,10 @@ export default function Home() {
           </li>
         ))}
       </ul>
+      <p>
+        Current turn: {currentTurn ? roster[currentTurn] ?? currentTurn : "—"}
+        {currentTurn === playerId && " (this is you!)"}
+      </p>
       {sessionId && (
         <button onClick={leaveSession}>Leave session</button>
       )}

@@ -3,6 +3,7 @@ package com.ava.digitaldeck.config;
 import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.services.ConnectionRegistry;
 import com.ava.digitaldeck.services.SessionService;
+import com.ava.digitaldeck.services.TurnService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
@@ -19,13 +20,15 @@ public class WebSocketEventListener {
     private final ConnectionRegistry connectionRegistry;
     private final SessionService sessionService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final TurnService turnService;
 
     @Autowired
     public WebSocketEventListener(ConnectionRegistry connectionRegistry, SessionService sessionService,
-                                    SimpMessagingTemplate messagingTemplate) {
+                                    SimpMessagingTemplate messagingTemplate, TurnService turnService) {
         this.connectionRegistry = connectionRegistry;
         this.sessionService = sessionService;
         this.messagingTemplate = messagingTemplate;
+        this.turnService = turnService;
     }
 
     @EventListener
@@ -38,6 +41,8 @@ public class WebSocketEventListener {
             return; // never joined a game session, nothing to clean up
         }
 
+        String nextPlayer = turnService.handlePlayerLeft(connection.sessionId(), connection.playerId()).orElse(null);
+        
         sessionService.removePlayer(connection.sessionId(), connection.playerId());
 
         SessionEvent leaveEvent = new SessionEvent(
@@ -53,5 +58,8 @@ public class WebSocketEventListener {
                 sessionService.getPlayers(connection.sessionId())
         );
         messagingTemplate.convertAndSend("/topic/session/" + connection.sessionId(), rosterEvent);
+
+        messagingTemplate.convertAndSend("/topic/session/" + connection.sessionId(),
+        new SessionEvent("TURN_CHANGED", connection.sessionId(), Map.of("playerId", nextPlayer)));
     }
 }

@@ -12,7 +12,6 @@ import java.util.Optional;
 public class TurnService {
 
     private static final Duration SESSION_TTL = Duration.ofHours(4);
-
     private final StringRedisTemplate redisTemplate;
 
     @Autowired
@@ -21,27 +20,54 @@ public class TurnService {
     }
 
     public void startTurns(String sessionId) {
-        redisTemplate.opsForValue().set("session:" + sessionId + ":turnIndex", "0", SESSION_TTL);
+        List<String> order = redisTemplate.opsForList().range(orderKey(sessionId), 0, -1);
+        if (order != null && !order.isEmpty()) {
+            redisTemplate.opsForValue().set(currentKey(sessionId), order.get(0), SESSION_TTL);
+        }
     }
 
     public Optional<String> getCurrentPlayer(String sessionId) {
-        List<String> order = redisTemplate.opsForList().range("session:" + sessionId + ":playerOrder", 0, -1);
-        if (order == null || order.isEmpty()) return Optional.empty();
-
-        String indexStr = redisTemplate.opsForValue().get("session:" + sessionId + ":turnIndex");
-        int index = (indexStr == null ? 0 : Integer.parseInt(indexStr)) % order.size();
-        return Optional.of(order.get(index));
+        return Optional.ofNullable(redisTemplate.opsForValue().get(currentKey(sessionId)));
     }
 
     public Optional<String> advanceTurn(String sessionId) {
-        List<String> order = redisTemplate.opsForList().range("session:" + sessionId + ":playerOrder", 0, -1);
+        List<String> order = redisTemplate.opsForList().range(orderKey(sessionId), 0, -1);
         if (order == null || order.isEmpty()) return Optional.empty();
 
-        String turnIndexKey = "session:" + sessionId + ":turnIndex";
-        String indexStr = redisTemplate.opsForValue().get(turnIndexKey);
-        int nextIndex = ((indexStr == null ? 0 : Integer.parseInt(indexStr)) + 1) % order.size();
+        String current = redisTemplate.opsForValue().get(currentKey(sessionId));
+        int idx = current == null ? -1 : order.indexOf(current);
+        String next = order.get((idx + 1) % order.size());
 
-        redisTemplate.opsForValue().set(turnIndexKey, String.valueOf(nextIndex), SESSION_TTL);
-        return Optional.of(order.get(nextIndex));
+        redisTemplate.opsForValue().set(currentKey(sessionId), next, SESSION_TTL);
+        return Optional.of(next);
     }
+
+    /** Call this BEFORE removing the player from playerOrder. */
+    public Optional<String> handlePlayerLeft(String sessionId, String playerId) {
+        String current = redisTemplate.opsForValue().get(currentKey(sessionId));
+        if (current == null || !current.equals(playerId)) {
+            return Optional.ofNullable(current); // wasn't their turn — nothing to do
+        }
+
+        List<String> order = redisTemplate.opsForList().range(orderKey(sessionId), 0, -1);
+        if (order == null || order.isEmpty()) {
+            redisTemplate.delete(currentKey(sessionId));
+            return Optional.empty();
+        }
+
+        int idx = order.indexOf(playerId);
+        for (int i = 1; i <= order.size(); i++) {
+            String candidate = order.get((idx + i) % order.size());
+            if (!candidate.equals(playerId)) {
+                redisTemplate.opsForValue().set(currentKey(sessionId), candidate, SESSION_TTL);
+                return Optional.of(candidate);
+            }
+        }
+
+        redisTemplate.delete(currentKey(sessionId)); // everyone left
+        return Optional.empty();
+    }
+
+    private String currentKey(String sessionId) { return "session:" + sessionId + ":currentTurnPlayer"; }
+    private String orderKey(String sessionId) { return "session:" + sessionId + ":playerOrder"; }
 }

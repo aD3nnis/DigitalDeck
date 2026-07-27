@@ -4,6 +4,7 @@ import com.ava.digitaldeck.model.JoinRequest;
 import com.ava.digitaldeck.model.LeaveRequest;  
 import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.services.SessionService;
+import com.ava.digitaldeck.services.TurnService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -20,14 +21,17 @@ public class SessionSocketController {
     private final SessionService sessionService;
     private final SimpMessagingTemplate messagingTemplate;
     private final ConnectionRegistry connectionRegistry;
+    private final TurnService turnService;
 
     @Autowired
     public SessionSocketController(SessionService sessionService,
                                    SimpMessagingTemplate messagingTemplate,
-                                   ConnectionRegistry connectionRegistry) {
+                                   ConnectionRegistry connectionRegistry,
+                                   TurnService turnService) {
         this.sessionService = sessionService;
         this.messagingTemplate = messagingTemplate;
         this.connectionRegistry = connectionRegistry;
+        this.turnService = turnService;
     }
 
     @MessageMapping("/session/{sessionId}/join")
@@ -58,25 +62,28 @@ public class SessionSocketController {
     }
 
     @MessageMapping("/session/{sessionId}/leave")
-        public void leave(@DestinationVariable String sessionId, LeaveRequest request) {
-            if (!sessionService.sessionExists(sessionId)) {
-                return;
-            }
-
-            sessionService.removePlayer(sessionId, request.playerId());
-
-            SessionEvent leaveEvent = new SessionEvent(
-                    "PLAYER_LEFT",
-                    sessionId,
-                    Map.of("playerId", request.playerId())
-            );
-            messagingTemplate.convertAndSend("/topic/session/" + sessionId, leaveEvent);
-
-            SessionEvent rosterEvent = new SessionEvent(
-                    "ROSTER",
-                    sessionId,
-                    sessionService.getPlayers(sessionId)
-            );
-            messagingTemplate.convertAndSend("/topic/session/" + sessionId, rosterEvent);
-        }
+    public void leave(@DestinationVariable String sessionId, LeaveRequest request) {
+        if (!sessionService.sessionExists(sessionId)) return;
+    
+        String nextPlayer = turnService.handlePlayerLeft(sessionId, request.playerId()).orElse(null);
+        
+        sessionService.removePlayer(sessionId, request.playerId());
+    
+        SessionEvent leaveEvent = new SessionEvent(
+                "PLAYER_LEFT",
+                sessionId,
+                Map.of("playerId", request.playerId())
+        );
+        messagingTemplate.convertAndSend("/topic/session/" + sessionId, leaveEvent);
+    
+        SessionEvent rosterEvent = new SessionEvent(
+                "ROSTER",
+                sessionId,
+                sessionService.getPlayers(sessionId)
+        );
+        messagingTemplate.convertAndSend("/topic/session/" + sessionId, rosterEvent);
+    
+        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
+                new SessionEvent("TURN_CHANGED", sessionId, Map.of("playerId", nextPlayer)));
+    }
 }
