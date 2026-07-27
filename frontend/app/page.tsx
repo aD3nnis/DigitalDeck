@@ -14,6 +14,8 @@ export default function Home() {
   const [currentTurn, setCurrentTurn] = useState<string | null>(null);
   const [hostId, setHostId] = useState<string | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
+  const [hand, setHand] = useState<string[]>([]);
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     const stompClient = new Client({
@@ -43,6 +45,9 @@ export default function Home() {
         setHostId(event.payload.playerId);
       } else if (event.type === "DECK_INITIALIZED") {
         setGameStarted(true);
+        setRemaining(event.payload.remaining);
+      } else if (event.type === "CARD_DRAWN") {
+        setRemaining(event.payload.remaining);
       } else if (event.type === "TURN_CHANGED") {
         setCurrentTurn(event.payload.playerId);
       } else {
@@ -98,6 +103,25 @@ export default function Home() {
     });
   };
 
+  const drawCard = async () => {
+    if (!sessionId) return;
+  
+    const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/draw`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId }),
+    });
+  
+    if (!res.ok) {
+      const error = await res.json();
+      alert(error.error ?? "Could not draw");
+      return;
+    }
+  
+    const { card } = await res.json();
+    setHand((prev) => [...prev, card]);
+  };
+
   const leaveSession = () => {
     if (!client || !sessionId) return;
   
@@ -135,7 +159,7 @@ export default function Home() {
           Join session
         </button>
       </section>
-      <h2>Players in session</h2>
+      {gameStarted && <h2>Players in session</h2>}
       <ul>
         {Object.entries(roster).map(([playerId, displayName]) => (
           <li key={playerId}>
@@ -146,10 +170,21 @@ export default function Home() {
         {sessionId && playerId === hostId && !gameStarted && (
           <button onClick={startGame}>Start game</button>
         )}
-      <p>
+        <br />
+      {gameStarted && <p>
         Current turn: {currentTurn ? roster[currentTurn] ?? currentTurn : "—"}
         {currentTurn === playerId && " (this is you!)"}
-      </p>
+      </p>}
+      {gameStarted && <p>Cards remaining: {remaining}</p>}
+      {sessionId && gameStarted && currentTurn === playerId && (
+        <button onClick={drawCard}>Draw card</button>
+      )}
+      {gameStarted && <h2>Your hand</h2>}
+      {gameStarted && <ul>
+        {hand.map((card, i) => (
+          <li key={i}>{card}</li>
+        ))}
+      </ul>}
         {sessionId && (
           <button onClick={leaveSession}>Leave session</button>
         )}
