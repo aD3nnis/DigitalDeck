@@ -12,6 +12,8 @@ export default function Home() {
   const [roster, setRoster] = useState<Record<string, string>>({});
   const [displayName, setDisplayName] = useState("");
   const [currentTurn, setCurrentTurn] = useState<string | null>(null);
+  const [hostId, setHostId] = useState<string | null>(null);
+  const [gameStarted, setGameStarted] = useState(false);
 
   useEffect(() => {
     const stompClient = new Client({
@@ -37,6 +39,10 @@ export default function Home() {
       const event = JSON.parse(message.body);
       if (event.type === "ROSTER") {
         setRoster(event.payload);
+      } else if (event.type === "HOST_CHANGED") {
+        setHostId(event.payload.playerId);
+      } else if (event.type === "DECK_INITIALIZED") {
+        setGameStarted(true);
       } else if (event.type === "TURN_CHANGED") {
         setCurrentTurn(event.payload.playerId);
       } else {
@@ -84,6 +90,14 @@ export default function Home() {
     subscribeAndJoin(resolvedId, client);
   };
 
+  const startGame = async () => {
+    if (!sessionId) return;
+  
+    await fetch(`http://localhost:8080/api/sessions/${sessionId}/deck/init?playerId=${playerId}`, {
+      method: "POST",
+    });
+  };
+
   const leaveSession = () => {
     if (!client || !sessionId) return;
   
@@ -129,13 +143,16 @@ export default function Home() {
           </li>
         ))}
       </ul>
+        {sessionId && playerId === hostId && !gameStarted && (
+          <button onClick={startGame}>Start game</button>
+        )}
       <p>
         Current turn: {currentTurn ? roster[currentTurn] ?? currentTurn : "—"}
         {currentTurn === playerId && " (this is you!)"}
       </p>
-      {sessionId && (
-        <button onClick={leaveSession}>Leave session</button>
-      )}
+        {sessionId && (
+          <button onClick={leaveSession}>Leave session</button>
+        )}
     </main>
   );
 }

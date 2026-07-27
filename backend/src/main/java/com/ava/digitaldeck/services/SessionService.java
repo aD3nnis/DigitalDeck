@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.List;
 
 @Service
 public class SessionService {
@@ -82,5 +83,13 @@ public class SessionService {
         Map<String, String> players = new HashMap<>();
         raw.forEach((k, v) -> players.put(k.toString(), v.toString()));
         return players;
+    }
+    public Optional<String> getHost(String sessionId) {
+        List<String> order = redisTemplate.opsForList().range("session:" + sessionId + ":playerOrder", 0, 0);
+        if (order == null || order.isEmpty()) return Optional.empty();
+        return Optional.of(order.get(0));
+    }
+    public boolean gameStarted(String sessionId) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey("session:" + sessionId + ":deck"));
     }
 }

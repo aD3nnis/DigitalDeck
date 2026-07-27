@@ -48,8 +48,16 @@ public class SessionController {
     }
 
     @PostMapping("/{sessionId}/deck/init")
-    public ResponseEntity<?> initDeck(@PathVariable String sessionId) {
+    public ResponseEntity<?> initDeck(@PathVariable String sessionId, @RequestParam String playerId) {
         if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
+    
+        Optional<String> host = sessionService.getHost(sessionId);
+        if (host.isEmpty() || !host.get().equals(playerId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "only the host can start the game"));
+        }
+        if (sessionService.gameStarted(sessionId)) {
+            return ResponseEntity.status(409).body(Map.of("error", "game already started"));
+        }
 
         deckService.initializeDeck(sessionId);
         turnService.startTurns(sessionId);

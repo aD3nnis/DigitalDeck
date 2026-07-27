@@ -13,6 +13,7 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 
 import java.util.Map;
+import java.util.HashMap;
 
 @Component
 public class WebSocketEventListener {
@@ -59,7 +60,14 @@ public class WebSocketEventListener {
         );
         messagingTemplate.convertAndSend("/topic/session/" + connection.sessionId(), rosterEvent);
 
+        Map<String, String> turnPayload = new HashMap<>();
+        turnPayload.put("playerId", nextPlayer);
         messagingTemplate.convertAndSend("/topic/session/" + connection.sessionId(),
-        new SessionEvent("TURN_CHANGED", connection.sessionId(), Map.of("playerId", nextPlayer)));
+                new SessionEvent("TURN_CHANGED", connection.sessionId(), turnPayload));
+
+        Map<String, String> hostPayload = new HashMap<>();
+        hostPayload.put("playerId", sessionService.getHost(connection.sessionId()).orElse(null));
+        messagingTemplate.convertAndSend("/topic/session/" + connection.sessionId(),
+                new SessionEvent("HOST_CHANGED", connection.sessionId(), hostPayload));
     }
 }

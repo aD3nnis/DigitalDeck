@@ -14,6 +14,7 @@ import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import com.ava.digitaldeck.services.ConnectionRegistry;
 
 import java.util.Map;
+import java.util.HashMap;
 
 @Controller
 public class SessionSocketController {
@@ -59,6 +60,11 @@ public class SessionSocketController {
                 sessionService.getPlayers(sessionId)
         );
         messagingTemplate.convertAndSend("/topic/session/" + sessionId, rosterEvent);
+
+        Map<String, String> hostPayload = new HashMap<>();
+        hostPayload.put("playerId", sessionService.getHost(sessionId).orElse(null));
+        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
+                new SessionEvent("HOST_CHANGED", sessionId, hostPayload));
     }
 
     @MessageMapping("/session/{sessionId}/leave")
@@ -83,7 +89,14 @@ public class SessionSocketController {
         );
         messagingTemplate.convertAndSend("/topic/session/" + sessionId, rosterEvent);
     
+        Map<String, String> turnPayload = new HashMap<>();
+        turnPayload.put("playerId", nextPlayer);
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                new SessionEvent("TURN_CHANGED", sessionId, Map.of("playerId", nextPlayer)));
+                new SessionEvent("TURN_CHANGED", sessionId, turnPayload));
+                
+        Map<String, String> hostPayload = new HashMap<>();
+        hostPayload.put("playerId", sessionService.getHost(sessionId).orElse(null));
+        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
+                new SessionEvent("HOST_CHANGED", sessionId, hostPayload));
     }
 }
