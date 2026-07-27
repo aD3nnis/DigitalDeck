@@ -17,46 +17,61 @@ export default function Home() {
   const [hand, setHand] = useState<string[]>([]);
   const [remaining, setRemaining] = useState<number | null>(null);
 
-  const [displayName, setDisplayName] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return sessionStorage.getItem("digitalDeck.displayName") ?? "";
-  });
-  
-  const [playerId] = useState(() => {
-    if (typeof window === "undefined") return "";
-    const stored = sessionStorage.getItem("digitalDeck.playerId");
-    if (stored) return stored;
-    const newId = crypto.randomUUID();
-    sessionStorage.setItem("digitalDeck.playerId", newId);
-    return newId;
-  });
-  
-  useEffect(() => {
-    const stompClient = new Client({
-      brokerURL: "ws://localhost:8080/ws",
-      onConnect: () => {
-        setClient(stompClient);
-  
-        const savedSessionId = sessionStorage.getItem("digitalDeck.sessionId");
-        const savedName = sessionStorage.getItem("digitalDeck.displayName");
-        if (savedSessionId && savedName) {
-          setDisplayName(savedName);
-          setSessionId(savedSessionId);
-          subscribeAndJoin(savedSessionId, stompClient);
-          rehydrateHand(savedSessionId);
-        }
-      },
-    });
-  
-    stompClient.activate();
-    return () => {
-      stompClient.deactivate();
-    };
-  }, []);
+  const [displayName, setDisplayName] = useState("");
+const [playerId, setPlayerId] = useState("");
 
-  const subscribeAndJoin = (resolvedSessionId: string, stompClient: Client) => {
-    if (sessionId === resolvedSessionId) return; // already in this session, don't resubscribe
-  
+useEffect(() => {
+  const nav = performance.getEntriesByType(
+    "navigation"
+  )[0] as PerformanceNavigationTiming | undefined;
+  const isReload = nav?.type === "reload";
+
+  let id = sessionStorage.getItem("digitalDeck.playerId");
+
+  if (!isReload || !id) {
+    // Fresh tab OR duplicated tab (copies sessionStorage but is not a reload)
+    id = crypto.randomUUID();
+    sessionStorage.setItem("digitalDeck.playerId", id);
+    sessionStorage.removeItem("digitalDeck.sessionId");
+    sessionStorage.removeItem("digitalDeck.displayName");
+    setDisplayName("");
+  } else {
+    setDisplayName(sessionStorage.getItem("digitalDeck.displayName") ?? "");
+  }
+
+  setPlayerId(id);
+
+  const stompClient = new Client({
+    brokerURL: "ws://localhost:8080/ws",
+    onConnect: () => {
+      setClient(stompClient);
+
+      const savedSessionId = sessionStorage.getItem("digitalDeck.sessionId");
+      const savedName = sessionStorage.getItem("digitalDeck.displayName");
+      // Only auto-rejoin after a real refresh (keys survived the branch above)
+      if (savedSessionId && savedName) {
+        setDisplayName(savedName);
+        setSessionId(savedSessionId);
+        subscribeAndJoin(savedSessionId, stompClient, id, savedName);
+        rehydrateHand(savedSessionId, id);
+      }
+    },
+  });
+
+  stompClient.activate();
+  return () => {
+    stompClient.deactivate();
+  };
+}, []);
+
+const subscribeAndJoin = (
+  resolvedSessionId: string,
+  stompClient: Client,
+  joinPlayerId: string = playerId,
+  joinDisplayName: string = displayName,
+) => {
+  if (sessionId === resolvedSessionId) return;
+
     stompClient.subscribe(`/topic/session/${resolvedSessionId}`, (message) => {
       const event = JSON.parse(message.body);
       if (event.type === "ROSTER") {
@@ -79,10 +94,26 @@ export default function Home() {
       }
     });
 
+
     stompClient.publish({
       destination: `/app/session/${resolvedSessionId}/join`,
-      body: JSON.stringify({ playerId, displayName }),
+      body: JSON.stringify({
+        playerId: joinPlayerId,
+        displayName: joinDisplayName,
+      }),
     });
+  };
+
+  const rehydrateHand = async (
+    resolvedSessionId: string,
+    handPlayerId: string = playerId,
+  ) => {
+    const res = await fetch(
+      `http://localhost:8080/api/sessions/${resolvedSessionId}/hand?playerId=${handPlayerId}`,
+    );
+    if (!res.ok) return;
+    const { hand: savedHand } = await res.json();
+    setHand(savedHand);
   };
 
   const createAndJoin = async () => {
@@ -150,13 +181,6 @@ export default function Home() {
   
     const { card } = await res.json();
     setHand((prev) => [...prev, card]);
-  };
-
-  const rehydrateHand = async (resolvedSessionId: string) => {
-    const res = await fetch(`http://localhost:8080/api/sessions/${resolvedSessionId}/hand?playerId=${playerId}`);
-    if (!res.ok) return;
-    const { hand: savedHand } = await res.json();
-    setHand(savedHand);
   };
 
   const leaveSession = () => {
