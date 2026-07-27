@@ -46,6 +46,10 @@ export default function Home() {
       } else if (event.type === "DECK_INITIALIZED") {
         setGameStarted(true);
         setRemaining(event.payload.remaining);
+      } else if (event.type === "GAME_STATE") {
+        setGameStarted(event.payload.gameStarted);
+        setRemaining(event.payload.remaining);
+        setCurrentTurn(event.payload.currentTurn);
       } else if (event.type === "CARD_DRAWN") {
         setRemaining(event.payload.remaining);
       } else if (event.type === "TURN_CHANGED") {

@@ -5,6 +5,7 @@ import com.ava.digitaldeck.model.LeaveRequest;
 import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.services.SessionService;
 import com.ava.digitaldeck.services.TurnService;
+import com.ava.digitaldeck.services.DeckService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -23,16 +24,19 @@ public class SessionSocketController {
     private final SimpMessagingTemplate messagingTemplate;
     private final ConnectionRegistry connectionRegistry;
     private final TurnService turnService;
+    private final DeckService deckService;
 
     @Autowired
     public SessionSocketController(SessionService sessionService,
                                    SimpMessagingTemplate messagingTemplate,
                                    ConnectionRegistry connectionRegistry,
-                                   TurnService turnService) {
+                                   TurnService turnService,
+                                   DeckService deckService) {
         this.sessionService = sessionService;
         this.messagingTemplate = messagingTemplate;
         this.connectionRegistry = connectionRegistry;
         this.turnService = turnService;
+        this.deckService = deckService;
     }
 
     @MessageMapping("/session/{sessionId}/join")
@@ -65,6 +69,15 @@ public class SessionSocketController {
         hostPayload.put("playerId", sessionService.getHost(sessionId).orElse(null));
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                 new SessionEvent("HOST_CHANGED", sessionId, hostPayload));
+
+        boolean started = sessionService.gameStarted(sessionId);
+        Map<String, Object> gameState = new HashMap<>();
+        gameState.put("gameStarted", started);
+        gameState.put("remaining", started ? deckService.remainingCount(sessionId) : null);
+        gameState.put("currentTurn", started ? turnService.getCurrentPlayer(sessionId).orElse(null) : null);
+        
+        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
+                new SessionEvent("GAME_STATE", sessionId, gameState));
     }
 
     @MessageMapping("/session/{sessionId}/leave")
@@ -93,7 +106,7 @@ public class SessionSocketController {
         turnPayload.put("playerId", nextPlayer);
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                 new SessionEvent("TURN_CHANGED", sessionId, turnPayload));
-                
+
         Map<String, String> hostPayload = new HashMap<>();
         hostPayload.put("playerId", sessionService.getHost(sessionId).orElse(null));
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
