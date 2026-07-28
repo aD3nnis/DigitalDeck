@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Client } from "@stomp/stompjs";
+import { useEffect, useRef, useState } from "react";
+import { Client, StompSubscription } from "@stomp/stompjs";
 
 
 export default function Home() {
@@ -17,103 +17,82 @@ export default function Home() {
   const [hand, setHand] = useState<string[]>([]);
   const [remaining, setRemaining] = useState<number | null>(null);
 
-  const [displayName, setDisplayName] = useState("");
-const [playerId, setPlayerId] = useState("");
-
-useEffect(() => {
-  const nav = performance.getEntriesByType(
-    "navigation"
-  )[0] as PerformanceNavigationTiming | undefined;
-  const isReload = nav?.type === "reload";
-
-  let id = sessionStorage.getItem("digitalDeck.playerId");
-
-  if (!isReload || !id) {
-    // Fresh tab OR duplicated tab (copies sessionStorage but is not a reload)
-    id = crypto.randomUUID();
-    sessionStorage.setItem("digitalDeck.playerId", id);
-    sessionStorage.removeItem("digitalDeck.sessionId");
-    sessionStorage.removeItem("digitalDeck.displayName");
-    setDisplayName("");
-  } else {
-    setDisplayName(sessionStorage.getItem("digitalDeck.displayName") ?? "");
-  }
-
-  setPlayerId(id);
-
-  const stompClient = new Client({
-    brokerURL: "ws://localhost:8080/ws",
-    onConnect: () => {
-      setClient(stompClient);
-
-      const savedSessionId = sessionStorage.getItem("digitalDeck.sessionId");
-      const savedName = sessionStorage.getItem("digitalDeck.displayName");
-      // Only auto-rejoin after a real refresh (keys survived the branch above)
-      if (savedSessionId && savedName) {
-        setDisplayName(savedName);
-        setSessionId(savedSessionId);
-        subscribeAndJoin(savedSessionId, stompClient, id, savedName);
-        rehydrateHand(savedSessionId, id);
-      }
-    },
+  const [displayName, setDisplayName] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return sessionStorage.getItem("digitalDeck.displayName") ?? "";
   });
 
-  stompClient.activate();
-  return () => {
-    stompClient.deactivate();
-  };
-}, []);
+  const [playerId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const stored = sessionStorage.getItem("digitalDeck.playerId");
+    if (stored) return stored;
+    const newId = crypto.randomUUID();
+    sessionStorage.setItem("digitalDeck.playerId", newId);
+    return newId;
+  });
 
-const subscribeAndJoin = (
-  resolvedSessionId: string,
-  stompClient: Client,
-  joinPlayerId: string = playerId,
-  joinDisplayName: string = displayName,
-) => {
-  if (sessionId === resolvedSessionId) return;
+  const sessionSubscriptionRef = useRef<StompSubscription | null>(null);
 
-    stompClient.subscribe(`/topic/session/${resolvedSessionId}`, (message) => {
-      const event = JSON.parse(message.body);
-      if (event.type === "ROSTER") {
-        setRoster(event.payload);
-      } else if (event.type === "HOST_CHANGED") {
-        setHostId(event.payload.playerId);
-      } else if (event.type === "DECK_INITIALIZED") {
-        setGameStarted(true);
-        setRemaining(event.payload.remaining);
-      } else if (event.type === "GAME_STATE") {
-        setGameStarted(event.payload.gameStarted);
-        setRemaining(event.payload.remaining);
-        setCurrentTurn(event.payload.currentTurn);
-      } else if (event.type === "CARD_DRAWN") {
-        setRemaining(event.payload.remaining);
-      } else if (event.type === "TURN_CHANGED") {
-        setCurrentTurn(event.payload.playerId);
-      } else {
-        setMessages((prev) => [...prev, message.body]);
-      }
+  useEffect(() => {
+    const stompClient = new Client({
+      brokerURL: "ws://localhost:8080/ws",
+      onConnect: () => {
+        setClient(stompClient);
+
+        const savedSessionId = sessionStorage.getItem("digitalDeck.sessionId");
+        const savedName = sessionStorage.getItem("digitalDeck.displayName");
+        if (savedSessionId && savedName) {
+          setDisplayName(savedName);
+          setSessionId(savedSessionId);
+          subscribeAndJoin(savedSessionId, stompClient);
+          rehydrateHand(savedSessionId);
+        }
+      },
     });
 
+    stompClient.activate();
+    return () => {
+      sessionSubscriptionRef.current?.unsubscribe();
+      sessionSubscriptionRef.current = null;
+      stompClient.deactivate();
+    };
+  }, []);
+
+  const subscribeAndJoin = (resolvedSessionId: string, stompClient: Client) => {
+    if (sessionId === resolvedSessionId) return;
+
+    sessionSubscriptionRef.current?.unsubscribe();
+    sessionSubscriptionRef.current = null;
+
+    sessionSubscriptionRef.current = stompClient.subscribe(
+      `/topic/session/${resolvedSessionId}`,
+      (message) => {
+        const event = JSON.parse(message.body);
+        if (event.type === "ROSTER") {
+          setRoster(event.payload);
+        } else if (event.type === "HOST_CHANGED") {
+          setHostId(event.payload.playerId);
+        } else if (event.type === "DECK_INITIALIZED") {
+          setGameStarted(true);
+          setRemaining(event.payload.remaining);
+        } else if (event.type === "GAME_STATE") {
+          setGameStarted(event.payload.gameStarted);
+          setRemaining(event.payload.remaining);
+          setCurrentTurn(event.payload.currentTurn);
+        } else if (event.type === "CARD_DRAWN") {
+          setRemaining(event.payload.remaining);
+        } else if (event.type === "TURN_CHANGED") {
+          setCurrentTurn(event.payload.playerId);
+        } else {
+          setMessages((prev) => [...prev, message.body]);
+        }
+      }
+    );
 
     stompClient.publish({
       destination: `/app/session/${resolvedSessionId}/join`,
-      body: JSON.stringify({
-        playerId: joinPlayerId,
-        displayName: joinDisplayName,
-      }),
+      body: JSON.stringify({ playerId, displayName }),
     });
-  };
-
-  const rehydrateHand = async (
-    resolvedSessionId: string,
-    handPlayerId: string = playerId,
-  ) => {
-    const res = await fetch(
-      `http://localhost:8080/api/sessions/${resolvedSessionId}/hand?playerId=${handPlayerId}`,
-    );
-    if (!res.ok) return;
-    const { hand: savedHand } = await res.json();
-    setHand(savedHand);
   };
 
   const createAndJoin = async () => {
@@ -132,7 +111,6 @@ const subscribeAndJoin = (
     setSessionId(resolvedId);
     sessionStorage.setItem("digitalDeck.sessionId", resolvedId);
     sessionStorage.setItem("digitalDeck.displayName", displayName);
-    
 
     subscribeAndJoin(resolvedId, client);
   };
@@ -149,16 +127,16 @@ const subscribeAndJoin = (
     }
     const { sessionId: resolvedId } = await resolveRes.json();
     setSessionId(resolvedId);
-    
+
     sessionStorage.setItem("digitalDeck.sessionId", resolvedId);
     sessionStorage.setItem("digitalDeck.displayName", displayName);
-    
+
     subscribeAndJoin(resolvedId, client);
   };
 
   const startGame = async () => {
     if (!sessionId) return;
-  
+
     await fetch(`http://localhost:8080/api/sessions/${sessionId}/deck/init?playerId=${playerId}`, {
       method: "POST",
     });
@@ -166,31 +144,41 @@ const subscribeAndJoin = (
 
   const drawCard = async () => {
     if (!sessionId) return;
-  
+
     const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/draw`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ playerId }),
     });
-  
+
     if (!res.ok) {
       const error = await res.json();
       alert(error.error ?? "Could not draw");
       return;
     }
-  
+
     const { card } = await res.json();
     setHand((prev) => [...prev, card]);
   };
 
+  const rehydrateHand = async (resolvedSessionId: string) => {
+    const res = await fetch(`http://localhost:8080/api/sessions/${resolvedSessionId}/hand?playerId=${playerId}`);
+    if (!res.ok) return;
+    const { hand: savedHand } = await res.json();
+    setHand(savedHand);
+  };
+
   const leaveSession = () => {
     if (!client || !sessionId) return;
-  
+
     client.publish({
       destination: `/app/session/${sessionId}/leave`,
       body: JSON.stringify({ playerId }),
     });
-  
+
+    sessionSubscriptionRef.current?.unsubscribe();
+    sessionSubscriptionRef.current = null;
+
     setSessionId(null);
     setRoster({});
     setMessages([]);
@@ -199,8 +187,7 @@ const subscribeAndJoin = (
     setHostId(null);
     setHand([]);
     setRemaining(null);
-    setCode(null); // optional — hides the old session code too
-  
+
     sessionStorage.removeItem("digitalDeck.sessionId");
     sessionStorage.removeItem("digitalDeck.displayName");
   };
@@ -229,18 +216,22 @@ const subscribeAndJoin = (
           Join session
         </button>
       </section>
-      {gameStarted && <h2>Players in session</h2>}
-      <ul>
-        {Object.entries(roster).map(([playerId, displayName]) => (
-          <li key={playerId}>
-            {displayName} <small>({playerId})</small>
-          </li>
-        ))}
-      </ul>
-        {sessionId && playerId === hostId && !gameStarted && (
-          <button onClick={startGame}>Start game</button>
-        )}
-        <br />
+      {sessionId && (
+        <>
+          {gameStarted && <h2>Players in session</h2>}
+          <ul>
+            {Object.entries(roster).map(([id, name]) => (
+              <li key={id}>
+                {name} <small>({id})</small>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {sessionId && playerId === hostId && !gameStarted && (
+        <button onClick={startGame}>Start game</button>
+      )}
+      <br />
       {gameStarted && <p>
         Current turn: {currentTurn ? roster[currentTurn] ?? currentTurn : "—"}
         {currentTurn === playerId && " (this is you!)"}
@@ -255,9 +246,9 @@ const subscribeAndJoin = (
           <li key={i}>{card}</li>
         ))}
       </ul>}
-        {sessionId && (
-          <button onClick={leaveSession}>Leave session</button>
-        )}
+      {sessionId && (
+        <button onClick={leaveSession}>Leave session</button>
+      )}
     </main>
   );
 }
