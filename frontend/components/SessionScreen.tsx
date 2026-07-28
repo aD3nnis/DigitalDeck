@@ -14,6 +14,7 @@ type Props = {
   onDraw: () => void;
   onLeave: () => void;
   onDiscard: (card: string) => void;
+  statusMessage: string | null;
 };
 
 
@@ -29,16 +30,14 @@ export default function SessionScreen({
   discardMode,
   topDiscard,
   onDiscard,
+  statusMessage,
 }: Props) {
   const canDraw =
     gameMode === "FREE_ROTATION" || currentTurn === playerId;
   const canDiscard =
     discardMode === "FREE_DISCARD" ||
     (discardMode === "TURN_DISCARD" && currentTurn === playerId);
-    // show pile when not off:
-    discardMode !== "DISCARD_OFF" && (
-      <p>Discard pile: {topDiscard ?? "(empty)"}</p>
-    );
+
 
   return (
     <main>
@@ -64,6 +63,11 @@ export default function SessionScreen({
 
       <p>Cards remaining: {remaining}</p>
 
+      {discardMode !== "DISCARD_OFF" && (
+        <p>Discard pile: {topDiscard ?? "(empty)"}</p>
+      )}
+      {statusMessage && <p>{statusMessage}</p>}
+      
       <h2>Your hand</h2>
       <ul>
       {hand.map((card, i) => (

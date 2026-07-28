@@ -111,16 +111,24 @@ public class SessionController {
             }
         }
     
-        Optional<String> card = deckService.drawCard(sessionId, request.playerId());
-        if (card.isEmpty()) return ResponseEntity.badRequest().body(Map.of("error", "deck is empty"));
+        Optional<DeckService.DrawResult> drawn = deckService.drawCard(sessionId, request.playerId());
+        if (drawn.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "deck is empty"));
+        }
     
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                new SessionEvent("CARD_DRAWN", sessionId, Map.of(
-                        "playerId", request.playerId(),
-                        "remaining", deckService.remainingCount(sessionId)
-                )));
+        DeckService.DrawResult result = drawn.get();
+        String topDiscard = deckService.getTopDiscard(sessionId).orElse(null);
     
-        // Continental-style: turn ends on discard, not draw
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("playerId", request.playerId());
+        payload.put("remaining", deckService.remainingCount(sessionId));
+        payload.put("reshuffled", result.reshuffled());
+        payload.put("topDiscard", topDiscard);
+    
+        messagingTemplate.convertAndSend(
+                "/topic/session/" + sessionId,
+                new SessionEvent("CARD_DRAWN", sessionId, payload));
+    
         boolean advanceOnDraw =
                 mode == GameMode.TURN_ROTATION && discardMode != DiscardMode.TURN_DISCARD;
     
@@ -130,7 +138,12 @@ public class SessionController {
                     new SessionEvent("TURN_CHANGED", sessionId, Map.of("playerId", nextPlayer)));
         }
     
-        return ResponseEntity.ok(Map.of("card", card.get()));
+        Map<String, Object> body = new HashMap<>();
+        body.put("card", result.card());
+        body.put("reshuffled", result.reshuffled());
+        body.put("remaining", deckService.remainingCount(sessionId));
+        body.put("topDiscard", topDiscard);
+        return ResponseEntity.ok(body);
     }
 
     @GetMapping("/{sessionId}/hand")

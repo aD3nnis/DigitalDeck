@@ -22,6 +22,13 @@ export default function Home() {
   const [gameMode, setGameMode] = useState<"TURN_ROTATION" | "FREE_ROTATION">("TURN_ROTATION");
   const [discardMode, setDiscardMode] = useState<DiscardMode>("DISCARD_OFF");
   const [topDiscard, setTopDiscard] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!statusMessage) return;
+    const id = setTimeout(() => setStatusMessage(null), 4000);
+    return () => clearTimeout(id);
+  }, [statusMessage]);
 
   const [displayName, setDisplayName] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -95,8 +102,14 @@ export default function Home() {
           setTopDiscard(event.payload.topDiscard);
         } else if (event.type === "GAME_MODE_CHANGED") {
           setGameMode(event.payload.gameMode);
-        }else if (event.type === "CARD_DRAWN") {
+        } else if (event.type === "CARD_DRAWN") {
           setRemaining(event.payload.remaining);
+          if (event.payload.topDiscard !== undefined) {
+            setTopDiscard(event.payload.topDiscard ?? null);
+          }
+          if (event.payload.reshuffled) {
+            setStatusMessage("Discard pile reshuffled into Draw pile");
+          }
         } else if (event.type === "TURN_CHANGED") {
           setCurrentTurn(event.payload.playerId);
         } else {
@@ -228,6 +241,7 @@ export default function Home() {
     setRemaining(null);
     setDiscardMode("DISCARD_OFF");
     setTopDiscard(null);
+    setStatusMessage(null);
 
     sessionStorage.removeItem("digitalDeck.sessionId");
     sessionStorage.removeItem("digitalDeck.displayName");
@@ -319,6 +333,7 @@ export default function Home() {
       discardMode={discardMode}
       topDiscard={topDiscard}
       onDiscard={discardCard}
+      statusMessage={statusMessage}
     />
   );
 

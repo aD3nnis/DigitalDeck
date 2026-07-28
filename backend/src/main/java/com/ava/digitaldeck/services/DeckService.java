@@ -64,19 +64,58 @@ public class DeckService {
         if (size == null || size == 0) return Optional.empty();
         return Optional.ofNullable(redisTemplate.opsForList().index(discardKey, -1));
     }
+    /** Result of a successful draw. */
+    public record DrawResult(String card, boolean reshuffled) {}
 
-    public Optional<String> drawCard(String sessionId, String playerId) {
+    /**
+     * Moves discard into draw deck (shuffled), leaving the top discard face-up when possible.
+     * If discard has only 1 card and deck is empty, that card is reshuffled into the deck
+     * (otherwise the game soft-locks).
+     * Returns how many cards were moved into the draw deck.
+     */
+    public int reshuffleDiscardIntoDeck(String sessionId) {
         String deckKey = "session:" + sessionId + ":deck";
+        String discardKey = "session:" + sessionId + ":discard";
+        List<String> discard = redisTemplate.opsForList().range(discardKey, 0, -1);
+        if (discard == null || discard.isEmpty()) {
+            return 0;
+        }
+        String keepTop = null;
+        // Leave top only when there is something underneath to reshuffle
+        if (discard.size() > 1) {
+            keepTop = discard.remove(discard.size() - 1);
+        }
+        Collections.shuffle(discard);
+        redisTemplate.delete(discardKey);
+        if (keepTop != null) {
+            redisTemplate.opsForList().rightPush(discardKey, keepTop);
+            redisTemplate.expire(discardKey, SESSION_TTL);
+        }
+        if (!discard.isEmpty()) {
+            redisTemplate.opsForList().rightPushAll(deckKey, discard);
+            redisTemplate.expire(deckKey, SESSION_TTL);
+        }
+        return discard.size();
+    }
+    public Optional<DrawResult> drawCard(String sessionId, String playerId) {
+        String deckKey = "session:" + sessionId + ":deck";
+        boolean reshuffled = false;
         String card = redisTemplate.opsForList().leftPop(deckKey);
         if (card == null) {
-            return Optional.empty();
+            int moved = reshuffleDiscardIntoDeck(sessionId);
+            if (moved == 0) {
+                return Optional.empty(); // deck empty AND discard empty/unusable
+            }
+            reshuffled = true;
+            card = redisTemplate.opsForList().leftPop(deckKey);
+            if (card == null) {
+                return Optional.empty();
+            }
         }
-
         String handKey = "session:" + sessionId + ":hands:" + playerId;
         redisTemplate.opsForList().rightPush(handKey, card);
         redisTemplate.expire(handKey, SESSION_TTL);
-
-        return Optional.of(card);
+        return Optional.of(new DrawResult(card, reshuffled));
     }
 
     public long remainingCount(String sessionId) {
