@@ -1,6 +1,6 @@
 "use client";
 
-import type { GameMode } from "./types";
+import type { DiscardMode, GameMode } from "./types";
 
 type Props = {
   roster: Record<string, string>;
@@ -9,9 +9,13 @@ type Props = {
   currentTurn: string | null;
   hand: string[];
   remaining: number | null;
+  discardMode: DiscardMode;
+  topDiscard: string | null;
   onDraw: () => void;
   onLeave: () => void;
+  onDiscard: (card: string) => void;
 };
+
 
 export default function SessionScreen({
   roster,
@@ -22,9 +26,19 @@ export default function SessionScreen({
   remaining,
   onDraw,
   onLeave,
+  discardMode,
+  topDiscard,
+  onDiscard,
 }: Props) {
   const canDraw =
     gameMode === "FREE_ROTATION" || currentTurn === playerId;
+  const canDiscard =
+    discardMode === "FREE_DISCARD" ||
+    (discardMode === "TURN_DISCARD" && currentTurn === playerId);
+    // show pile when not off:
+    discardMode !== "DISCARD_OFF" && (
+      <p>Discard pile: {topDiscard ?? "(empty)"}</p>
+    );
 
   return (
     <main>
@@ -52,10 +66,17 @@ export default function SessionScreen({
 
       <h2>Your hand</h2>
       <ul>
-        {hand.map((card, i) => (
-          <li key={i}>{card}</li>
-        ))}
-      </ul>
+      {hand.map((card, i) => (
+        <li key={`${card}-${i}`}>
+          {card}
+          {canDiscard && (
+            <button type="button" onClick={() => onDiscard(card)}>
+              Discard
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
 
       <button onClick={onLeave}>Leave session</button>
     </main>

@@ -13,10 +13,13 @@ import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.model.CreateSessionRequest;
 import com.ava.digitaldeck.model.GameMode;
 import com.ava.digitaldeck.model.UpdateGameModeRequest;
-
+import com.ava.digitaldeck.model.DiscardMode;
+import com.ava.digitaldeck.model.DiscardRequest;
+import com.ava.digitaldeck.model.UpdateDiscardModeRequest;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.Map;
 
@@ -41,8 +44,13 @@ public class SessionController {
     @PostMapping
     public Map<String, String> createSession(@RequestBody(required = false) CreateSessionRequest request) {
         GameMode mode = GameMode.from(request == null ? null : request.gameMode());
-        String code = sessionService.createSession(mode);
-        return Map.of("code", code, "gameMode", mode.name());
+        DiscardMode discardMode = DiscardMode.from(request == null ? null : request.discardMode());
+        String code = sessionService.createSession(mode, discardMode);
+        return Map.of(
+                "code", code,
+                "gameMode", mode.name(),
+                "discardMode", discardMode.name()
+        );
     }
 
     @GetMapping("/{code}")
@@ -94,6 +102,7 @@ public class SessionController {
         if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
     
         GameMode mode = sessionService.getGameMode(sessionId);
+        DiscardMode discardMode = sessionService.getDiscardMode(sessionId);
     
         if (mode == GameMode.TURN_ROTATION) {
             Optional<String> currentPlayer = turnService.getCurrentPlayer(sessionId);
@@ -111,14 +120,18 @@ public class SessionController {
                         "remaining", deckService.remainingCount(sessionId)
                 )));
     
-        if (mode == GameMode.TURN_ROTATION) {
+        // Continental-style: turn ends on discard, not draw
+        boolean advanceOnDraw =
+                mode == GameMode.TURN_ROTATION && discardMode != DiscardMode.TURN_DISCARD;
+    
+        if (advanceOnDraw) {
             String nextPlayer = turnService.advanceTurn(sessionId).orElse(null);
             messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                     new SessionEvent("TURN_CHANGED", sessionId, Map.of("playerId", nextPlayer)));
         }
     
         return ResponseEntity.ok(Map.of("card", card.get()));
-    } 
+    }
 
     @GetMapping("/{sessionId}/hand")
     public ResponseEntity<?> getHand(@PathVariable String sessionId, @RequestParam String playerId) {
@@ -155,6 +168,79 @@ public class SessionController {
                         Map.of("gameMode", mode.name())));
 
         return ResponseEntity.ok(Map.of("gameMode", mode.name()));
+    }
+    @PostMapping("/{sessionId}/discard")
+    public ResponseEntity<?> discard(@PathVariable String sessionId, @RequestBody DiscardRequest request) {
+        if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
+
+        DiscardMode discardMode = sessionService.getDiscardMode(sessionId);
+        if (discardMode == DiscardMode.DISCARD_OFF) {
+            return ResponseEntity.status(403).body(Map.of("error", "discard is disabled"));
+        }
+
+        GameMode mode = sessionService.getGameMode(sessionId);
+
+        if (discardMode == DiscardMode.TURN_DISCARD) {
+            Optional<String> currentPlayer = turnService.getCurrentPlayer(sessionId);
+            if (currentPlayer.isEmpty() || !currentPlayer.get().equals(request.playerId())) {
+                return ResponseEntity.status(403).body(Map.of("error", "not your turn"));
+            }
+        }
+
+        Optional<String> discarded = deckService.discardCard(sessionId, request.playerId(), request.card());
+        if (discarded.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "card not in hand"));
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("playerId", request.playerId());
+        payload.put("card", discarded.get());
+        payload.put("topDiscard", discarded.get());
+
+        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
+                new SessionEvent("CARD_DISCARDED", sessionId, payload));
+
+        // Turn Rotation + Turn Discard: discard ends the turn
+        if (mode == GameMode.TURN_ROTATION && discardMode == DiscardMode.TURN_DISCARD) {
+            String nextPlayer = turnService.advanceTurn(sessionId).orElse(null);
+            messagingTemplate.convertAndSend("/topic/session/" + sessionId,
+                    new SessionEvent("TURN_CHANGED", sessionId, Map.of("playerId", nextPlayer)));
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "card", discarded.get(),
+                "topDiscard", discarded.get()
+        ));
+    }
+    @PatchMapping("/{sessionId}/discard-mode")
+    public ResponseEntity<?> updateDiscardMode(
+            @PathVariable String sessionId,
+            @RequestBody UpdateDiscardModeRequest request) {
+
+        if (!sessionService.sessionExists(sessionId)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Optional<String> host = sessionService.getHost(sessionId);
+        if (host.isEmpty() || !host.get().equals(request.playerId())) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("error", "only the host can change discard mode"));
+        }
+
+        if (sessionService.gameStarted(sessionId)) {
+            return ResponseEntity.status(409)
+                    .body(Map.of("error", "game already started"));
+        }
+
+        DiscardMode discardMode = DiscardMode.from(request.discardMode());
+        sessionService.setDiscardMode(sessionId, discardMode);
+
+        messagingTemplate.convertAndSend(
+                "/topic/session/" + sessionId,
+                new SessionEvent("DISCARD_MODE_CHANGED", sessionId,
+                        Map.of("discardMode", discardMode.name())));
+
+        return ResponseEntity.ok(Map.of("discardMode", discardMode.name()));
     }
 
 

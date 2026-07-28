@@ -5,6 +5,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import com.ava.digitaldeck.model.GameMode;
+import com.ava.digitaldeck.model.DiscardMode;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -30,11 +31,10 @@ public class SessionService {
         this.redisTemplate = redisTemplate;
     }
 
-   
-    public String createSession(GameMode gameMode) {
+    public String createSession(GameMode gameMode, DiscardMode discardMode) {
         String sessionId = UUID.randomUUID().toString();
         String code = generateUniqueCode();
-
+    
         redisTemplate.opsForValue().set("code:" + code, sessionId, SESSION_TTL);
         redisTemplate.opsForValue().set("session:" + sessionId + ":meta", "active", SESSION_TTL);
         redisTemplate.opsForValue().set(
@@ -42,8 +42,26 @@ public class SessionService {
                 gameMode.name(),
                 SESSION_TTL
         );
-
+        redisTemplate.opsForValue().set(
+                "session:" + sessionId + ":discardMode",
+                discardMode.name(),
+                SESSION_TTL
+        );
+    
         return code;
+    }
+    
+    public DiscardMode getDiscardMode(String sessionId) {
+        String raw = redisTemplate.opsForValue().get("session:" + sessionId + ":discardMode");
+        return DiscardMode.from(raw);
+    }
+    
+    public void setDiscardMode(String sessionId, DiscardMode discardMode) {
+        redisTemplate.opsForValue().set(
+                "session:" + sessionId + ":discardMode",
+                discardMode.name(),
+                SESSION_TTL
+        );
     }
 
     public GameMode getGameMode(String sessionId) {

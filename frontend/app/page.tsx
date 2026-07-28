@@ -5,6 +5,7 @@ import { Client, StompSubscription } from "@stomp/stompjs";
 import HomeScreen from "../components/HomeScreen";
 import LobbyScreen from "../components/LobbyScreen";
 import SessionScreen from "../components/SessionScreen";
+import type { DiscardMode } from "../components/types";
 
 export default function Home() {
   const [messages, setMessages] = useState<string[]>([]);
@@ -19,6 +20,8 @@ export default function Home() {
   const [hand, setHand] = useState<string[]>([]);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [gameMode, setGameMode] = useState<"TURN_ROTATION" | "FREE_ROTATION">("TURN_ROTATION");
+  const [discardMode, setDiscardMode] = useState<DiscardMode>("DISCARD_OFF");
+  const [topDiscard, setTopDiscard] = useState<string | null>(null);
 
   const [displayName, setDisplayName] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -84,6 +87,12 @@ export default function Home() {
           setRemaining(event.payload.remaining);
           setCurrentTurn(event.payload.currentTurn);
           if (event.payload.gameMode) setGameMode(event.payload.gameMode);
+          if (event.payload.discardMode) setDiscardMode(event.payload.discardMode);
+          setTopDiscard(event.payload.topDiscard ?? null);
+        } else if (event.type === "DISCARD_MODE_CHANGED") {
+          setDiscardMode(event.payload.discardMode);
+        } else if (event.type === "CARD_DISCARDED") {
+          setTopDiscard(event.payload.topDiscard);
         } else if (event.type === "GAME_MODE_CHANGED") {
           setGameMode(event.payload.gameMode);
         }else if (event.type === "CARD_DRAWN") {
@@ -107,11 +116,13 @@ export default function Home() {
     const createRes = await fetch("http://localhost:8080/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameMode }),
+      body: JSON.stringify({ gameMode, discardMode }),
     });
-    const { code: newCode, gameMode: createdMode } = await createRes.json();
-    setCode(newCode);
+    const { code: newCode, gameMode: createdMode, discardMode: createdDiscard } =
+      await createRes.json();
     setGameMode(createdMode);
+    setDiscardMode(createdDiscard);
+    setCode(newCode);
 
     const resolveRes = await fetch(
       `http://localhost:8080/api/sessions/${newCode}`
@@ -215,32 +226,51 @@ export default function Home() {
     setHostId(null);
     setHand([]);
     setRemaining(null);
+    setDiscardMode("DISCARD_OFF");
+    setTopDiscard(null);
 
     sessionStorage.removeItem("digitalDeck.sessionId");
     sessionStorage.removeItem("digitalDeck.displayName");
   };
-  const modeRadios = (onSelect: (mode: "TURN_ROTATION" | "FREE_ROTATION") => void) => (
-    <section>
-      <label>
-        <input
-          type="radio"
-          name="gameMode"
-          checked={gameMode === "TURN_ROTATION"}
-          onChange={() => onSelect("TURN_ROTATION")}
-        />
-        Turn Rotation
-      </label>
-      <label>
-        <input
-          type="radio"
-          name="gameMode"
-          checked={gameMode === "FREE_ROTATION"}
-          onSelect={() => onSelect("FREE_ROTATION")}
-        />
-        Free Rotation
-      </label>
-    </section>
-  );
+
+  const discardCard = async (card: string) => {
+    if (!sessionId) return;
+  
+    const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/discard`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId, card }),
+    });
+  
+    if (!res.ok) {
+      const error = await res.json();
+      alert(error.error ?? "Could not discard");
+      return;
+    }
+  
+    setHand((prev) => {
+      const idx = prev.indexOf(card);
+      if (idx === -1) return prev;
+      return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+    });
+  };
+  const updateDiscardMode = async (next: DiscardMode) => {
+    if (!sessionId) return;
+    const res = await fetch(
+      `http://localhost:8080/api/sessions/${sessionId}/discard-mode`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ discardMode: next, playerId }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error ?? "Could not update discard mode");
+      return;
+    }
+    setDiscardMode(next);
+  };
 
   if (!sessionId) {
     return (
@@ -249,11 +279,13 @@ export default function Home() {
         joinCodeInput={joinCodeInput}
         gameMode={gameMode}
         clientReady={!!client}
+        discardMode={discardMode}
         onDisplayNameChange={setDisplayName}
         onJoinCodeChange={setJoinCodeInput}
         onGameModeChange={setGameMode}
         onCreate={createAndJoin}
         onJoin={joinExisting}
+        onDiscardModeChange={setDiscardMode}
       />
     );
   }
@@ -266,10 +298,11 @@ export default function Home() {
         playerId={playerId}
         hostId={hostId}
         gameMode={gameMode}
+        discardMode={discardMode}
         onUpdateGameMode={updateGameMode}
         onStart={startGame}
         onLeave={leaveSession}
-      />
+        onUpdateDiscardMode={updateDiscardMode}      />
     );
   }
   
@@ -283,6 +316,9 @@ export default function Home() {
       remaining={remaining}
       onDraw={drawCard}
       onLeave={leaveSession}
+      discardMode={discardMode}
+      topDiscard={topDiscard}
+      onDiscard={discardCard}
     />
   );
 

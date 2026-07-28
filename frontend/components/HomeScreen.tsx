@@ -1,17 +1,20 @@
 "use client";
 
-import type { GameMode } from "./types";
+import type { DiscardMode, GameMode } from "./types";
+
 
 type Props = {
   displayName: string;
   joinCodeInput: string;
   gameMode: GameMode;
   clientReady: boolean;
+  discardMode: DiscardMode;
   onDisplayNameChange: (name: string) => void;
   onJoinCodeChange: (code: string) => void;
   onGameModeChange: (mode: GameMode) => void;
   onCreate: () => void;
   onJoin: () => void;
+  onDiscardModeChange: (mode: DiscardMode) => void;
 };
 
 export default function HomeScreen({
@@ -24,6 +27,8 @@ export default function HomeScreen({
   onGameModeChange,
   onCreate,
   onJoin,
+  discardMode,
+  onDiscardModeChange,
 }: Props) {
   return (
     <main>
@@ -57,6 +62,36 @@ export default function HomeScreen({
           Free Rotation
         </label>
       </section>
+
+      <section>
+      <label>
+        <input
+          type="radio"
+          name="discardMode"
+          checked={discardMode === "DISCARD_OFF"}
+          onChange={() => onDiscardModeChange("DISCARD_OFF")}
+        />
+        Discard Off
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="discardMode"
+          checked={discardMode === "TURN_DISCARD"}
+          onChange={() => onDiscardModeChange("TURN_DISCARD")}
+        />
+        Turn Discard
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="discardMode"
+          checked={discardMode === "FREE_DISCARD"}
+          onChange={() => onDiscardModeChange("FREE_DISCARD")}
+        />
+        Free Discard
+      </label>
+    </section>
 
       <section>
         <button onClick={onCreate} disabled={!clientReady || !displayName}>

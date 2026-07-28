@@ -29,11 +29,40 @@ public class DeckService {
             }
         }
         Collections.shuffle(cards);
-
+    
         String deckKey = "session:" + sessionId + ":deck";
+        String discardKey = "session:" + sessionId + ":discard";
+    
         redisTemplate.delete(deckKey);
+        redisTemplate.delete(discardKey);
         redisTemplate.opsForList().rightPushAll(deckKey, cards);
         redisTemplate.expire(deckKey, SESSION_TTL);
+    }
+    
+    /** Moves card from hand → discard pile. Empty if card not in hand. */
+    public Optional<String> discardCard(String sessionId, String playerId, String card) {
+        if (card == null || card.isBlank()) return Optional.empty();
+    
+        String handKey = "session:" + sessionId + ":hands:" + playerId;
+        Long removed = redisTemplate.opsForList().remove(handKey, 1, card);
+        if (removed == null || removed == 0) {
+            return Optional.empty();
+        }
+    
+        String discardKey = "session:" + sessionId + ":discard";
+        redisTemplate.opsForList().rightPush(discardKey, card);
+        redisTemplate.expire(discardKey, SESSION_TTL);
+        redisTemplate.expire(handKey, SESSION_TTL);
+    
+        return Optional.of(card);
+    }
+    
+    /** Top of discard = most recently discarded (rightmost). */
+    public Optional<String> getTopDiscard(String sessionId) {
+        String discardKey = "session:" + sessionId + ":discard";
+        Long size = redisTemplate.opsForList().size(discardKey);
+        if (size == null || size == 0) return Optional.empty();
+        return Optional.ofNullable(redisTemplate.opsForList().index(discardKey, -1));
     }
 
     public Optional<String> drawCard(String sessionId, String playerId) {
