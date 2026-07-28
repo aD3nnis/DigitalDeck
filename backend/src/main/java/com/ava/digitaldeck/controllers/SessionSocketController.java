@@ -3,6 +3,7 @@ package com.ava.digitaldeck.controllers;
 import com.ava.digitaldeck.model.JoinRequest;
 import com.ava.digitaldeck.model.LeaveRequest;  
 import com.ava.digitaldeck.model.SessionEvent;
+import com.ava.digitaldeck.model.GameMode;
 import com.ava.digitaldeck.services.SessionService;
 import com.ava.digitaldeck.services.TurnService;
 import com.ava.digitaldeck.services.DeckService;
@@ -76,10 +77,16 @@ public class SessionSocketController {
                 new SessionEvent("HOST_CHANGED", sessionId, hostPayload));
 
         boolean started = sessionService.gameStarted(sessionId);
+        GameMode mode = sessionService.getGameMode(sessionId);
+        
         Map<String, Object> gameState = new HashMap<>();
         gameState.put("gameStarted", started);
+        gameState.put("gameMode", mode.name());
         gameState.put("remaining", started ? deckService.remainingCount(sessionId) : null);
-        gameState.put("currentTurn", started ? turnService.getCurrentPlayer(sessionId).orElse(null) : null);
+        gameState.put("currentTurn",
+                started && mode == GameMode.TURN_ROTATION
+                        ? turnService.getCurrentPlayer(sessionId).orElse(null)
+                        : null);
         
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                 new SessionEvent("GAME_STATE", sessionId, gameState));

@@ -16,6 +16,7 @@ export default function Home() {
   const [gameStarted, setGameStarted] = useState(false);
   const [hand, setHand] = useState<string[]>([]);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [gameMode, setGameMode] = useState<"TURN_ROTATION" | "FREE_ROTATION">("TURN_ROTATION");
 
   const [displayName, setDisplayName] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -75,10 +76,12 @@ export default function Home() {
         } else if (event.type === "DECK_INITIALIZED") {
           setGameStarted(true);
           setRemaining(event.payload.remaining);
+          if (event.payload.gameMode) setGameMode(event.payload.gameMode);
         } else if (event.type === "GAME_STATE") {
           setGameStarted(event.payload.gameStarted);
           setRemaining(event.payload.remaining);
           setCurrentTurn(event.payload.currentTurn);
+          if (event.payload.gameMode) setGameMode(event.payload.gameMode);
         } else if (event.type === "CARD_DRAWN") {
           setRemaining(event.payload.remaining);
         } else if (event.type === "TURN_CHANGED") {
@@ -97,12 +100,14 @@ export default function Home() {
 
   const createAndJoin = async () => {
     if (!client || !playerId) return;
-
     const createRes = await fetch("http://localhost:8080/api/sessions", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gameMode }),
     });
-    const { code: newCode } = await createRes.json();
+    const { code: newCode, gameMode: createdMode } = await createRes.json();
     setCode(newCode);
+    setGameMode(createdMode);
 
     const resolveRes = await fetch(
       `http://localhost:8080/api/sessions/${newCode}`
@@ -232,14 +237,42 @@ export default function Home() {
         <button onClick={startGame}>Start game</button>
       )}
       <br />
-      {gameStarted && <p>
-        Current turn: {currentTurn ? roster[currentTurn] ?? currentTurn : "—"}
-        {currentTurn === playerId && " (this is you!)"}
-      </p>}
-      {gameStarted && <p>Cards remaining: {remaining}</p>}
-      {sessionId && gameStarted && currentTurn === playerId && (
+      {!sessionId && (
+      <section>
+        <label>
+          <input
+            type="radio"
+            name="gameMode"
+            checked={gameMode === "TURN_ROTATION"}
+            onChange={() => setGameMode("TURN_ROTATION")}
+          />
+          Turn Rotation
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="gameMode"
+            checked={gameMode === "FREE_ROTATION"}
+            onChange={() => setGameMode("FREE_ROTATION")}
+          />
+          Free Rotation
+        </label>
+      </section>
+      )}
+
+      {gameStarted && gameMode === "TURN_ROTATION" && (
+        <p>
+          Current turn: {currentTurn ? roster[currentTurn] ?? currentTurn : "—"}
+          {currentTurn === playerId && " (this is you!)"}
+        </p>
+      )}
+
+      {sessionId && gameStarted && (
+        gameMode === "FREE_ROTATION" || currentTurn === playerId
+      ) && (
         <button onClick={drawCard}>Draw card</button>
       )}
+      {gameStarted && <p>Cards remaining: {remaining}</p>}
       {gameStarted && <h2>Your hand</h2>}
       {gameStarted && <ul>
         {hand.map((card, i) => (

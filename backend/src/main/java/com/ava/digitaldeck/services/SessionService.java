@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import com.ava.digitaldeck.model.GameMode;
+
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Optional;
@@ -28,14 +30,25 @@ public class SessionService {
         this.redisTemplate = redisTemplate;
     }
 
-    public String createSession() {
+   
+    public String createSession(GameMode gameMode) {
         String sessionId = UUID.randomUUID().toString();
         String code = generateUniqueCode();
 
         redisTemplate.opsForValue().set("code:" + code, sessionId, SESSION_TTL);
         redisTemplate.opsForValue().set("session:" + sessionId + ":meta", "active", SESSION_TTL);
+        redisTemplate.opsForValue().set(
+                "session:" + sessionId + ":gameMode",
+                gameMode.name(),
+                SESSION_TTL
+        );
 
         return code;
+    }
+
+    public GameMode getGameMode(String sessionId) {
+        String raw = redisTemplate.opsForValue().get("session:" + sessionId + ":gameMode");
+        return GameMode.from(raw);
     }
 
     public Optional<String> resolveCode(String code) {

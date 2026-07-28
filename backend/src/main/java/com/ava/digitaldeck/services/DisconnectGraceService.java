@@ -1,6 +1,8 @@
 package com.ava.digitaldeck.services;
 
 import com.ava.digitaldeck.model.SessionEvent;
+import com.ava.digitaldeck.model.GameMode;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -67,22 +69,29 @@ public class DisconnectGraceService {
     private void finalizeLeave(String sessionId, String playerId) {
         pending.remove(key(sessionId, playerId));
         if (!sessionService.sessionExists(sessionId)) return;
-
-        // Same body as today's leave / disconnect cleanup:
-        String nextPlayer = turnService.handlePlayerLeft(sessionId, playerId).orElse(null);
+    
+        GameMode mode = sessionService.getGameMode(sessionId);
+        String nextPlayer = null;
+    
+        if (mode == GameMode.TURN_ROTATION) {
+            nextPlayer = turnService.handlePlayerLeft(sessionId, playerId).orElse(null);
+        }
+    
         sessionService.removePlayer(sessionId, playerId);
-
+    
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                 new SessionEvent("PLAYER_LEFT", sessionId, Map.of("playerId", playerId)));
-
+    
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                 new SessionEvent("ROSTER", sessionId, sessionService.getPlayers(sessionId)));
-
-        Map<String, String> turnPayload = new HashMap<>();
-        turnPayload.put("playerId", nextPlayer);
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                new SessionEvent("TURN_CHANGED", sessionId, turnPayload));
-
+    
+        if (mode == GameMode.TURN_ROTATION) {
+            Map<String, String> turnPayload = new HashMap<>();
+            turnPayload.put("playerId", nextPlayer);
+            messagingTemplate.convertAndSend("/topic/session/" + sessionId,
+                    new SessionEvent("TURN_CHANGED", sessionId, turnPayload));
+        }
+    
         Map<String, String> hostPayload = new HashMap<>();
         hostPayload.put("playerId", sessionService.getHost(sessionId).orElse(null));
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
