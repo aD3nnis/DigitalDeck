@@ -12,6 +12,8 @@ import com.ava.digitaldeck.model.DrawRequest;
 import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.model.CreateSessionRequest;
 import com.ava.digitaldeck.model.GameMode;
+import com.ava.digitaldeck.model.UpdateGameModeRequest;
+
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -123,4 +125,37 @@ public class SessionController {
         if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(Map.of("hand", deckService.getHand(sessionId, playerId)));
     }
+
+    @PatchMapping("/{sessionId}/game-mode")
+    public ResponseEntity<?> updateGameMode(
+            @PathVariable String sessionId,
+            @RequestBody UpdateGameModeRequest request) {
+
+        if (!sessionService.sessionExists(sessionId)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Optional<String> host = sessionService.getHost(sessionId);
+        if (host.isEmpty() || !host.get().equals(request.playerId())) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("error", "only the host can change game mode"));
+        }
+
+        if (sessionService.gameStarted(sessionId)) {
+            return ResponseEntity.status(409)
+                    .body(Map.of("error", "game already started"));
+        }
+
+        GameMode mode = GameMode.from(request.gameMode());
+        sessionService.setGameMode(sessionId, mode);
+
+        messagingTemplate.convertAndSend(
+                "/topic/session/" + sessionId,
+                new SessionEvent("GAME_MODE_CHANGED", sessionId,
+                        Map.of("gameMode", mode.name())));
+
+        return ResponseEntity.ok(Map.of("gameMode", mode.name()));
+    }
+
+
 }

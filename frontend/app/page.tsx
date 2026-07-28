@@ -82,7 +82,9 @@ export default function Home() {
           setRemaining(event.payload.remaining);
           setCurrentTurn(event.payload.currentTurn);
           if (event.payload.gameMode) setGameMode(event.payload.gameMode);
-        } else if (event.type === "CARD_DRAWN") {
+        } else if (event.type === "GAME_MODE_CHANGED") {
+          setGameMode(event.payload.gameMode);
+        }else if (event.type === "CARD_DRAWN") {
           setRemaining(event.payload.remaining);
         } else if (event.type === "TURN_CHANGED") {
           setCurrentTurn(event.payload.playerId);
@@ -147,6 +149,25 @@ export default function Home() {
     });
   };
 
+  const updateGameMode = async (next: "TURN_ROTATION" | "FREE_ROTATION") => {
+    if (!sessionId) return;
+    const res = await fetch(
+      `http://localhost:8080/api/sessions/${sessionId}/game-mode`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameMode: next, playerId }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error ?? "Could not update mode");
+      return;
+    }
+    // optimistic optional; WS will confirm
+    setGameMode(next);
+  };
+
   const drawCard = async () => {
     if (!sessionId) return;
 
@@ -196,6 +217,28 @@ export default function Home() {
     sessionStorage.removeItem("digitalDeck.sessionId");
     sessionStorage.removeItem("digitalDeck.displayName");
   };
+  const modeRadios = (onSelect: (mode: "TURN_ROTATION" | "FREE_ROTATION") => void) => (
+    <section>
+      <label>
+        <input
+          type="radio"
+          name="gameMode"
+          checked={gameMode === "TURN_ROTATION"}
+          onChange={() => onSelect("TURN_ROTATION")}
+        />
+        Turn Rotation
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="gameMode"
+          checked={gameMode === "FREE_ROTATION"}
+          onSelect={() => onSelect("FREE_ROTATION")}
+        />
+        Free Rotation
+      </label>
+    </section>
+  );
 
   return (
     <main>
@@ -237,27 +280,60 @@ export default function Home() {
         <button onClick={startGame}>Start game</button>
       )}
       <br />
+      {/* Home — pick mode before create; local state only */}
       {!sessionId && (
-      <section>
-        <label>
-          <input
-            type="radio"
-            name="gameMode"
-            checked={gameMode === "TURN_ROTATION"}
-            onChange={() => setGameMode("TURN_ROTATION")}
-          />
-          Turn Rotation
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="gameMode"
-            checked={gameMode === "FREE_ROTATION"}
-            onChange={() => setGameMode("FREE_ROTATION")}
-          />
-          Free Rotation
-        </label>
-      </section>
+        <section>
+          <label>
+            <input
+              type="radio"
+              name="gameMode"
+              checked={gameMode === "TURN_ROTATION"}
+              onChange={() => setGameMode("TURN_ROTATION")}
+            />
+            Turn Rotation
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="gameMode"
+              checked={gameMode === "FREE_ROTATION"}
+              onChange={() => setGameMode("FREE_ROTATION")}
+            />
+            Free Rotation
+          </label>
+        </section>
+      )}
+
+      {/* Lobby — host can still change (calls PATCH) */}
+      {sessionId && !gameStarted && playerId === hostId && (
+        <section>
+          <label>
+            <input
+              type="radio"
+              name="gameMode"
+              checked={gameMode === "TURN_ROTATION"}
+              onChange={() => updateGameMode("TURN_ROTATION")}
+            />
+            Turn Rotation
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="gameMode"
+              checked={gameMode === "FREE_ROTATION"}
+              onChange={() => updateGameMode("FREE_ROTATION")}
+            />
+            Free Rotation
+          </label>
+        </section>
+      )}
+
+      {/* Lobby — everyone else sees mode, can’t edit */}
+      {sessionId && !gameStarted && playerId !== hostId && (
+        <p>
+          Mode:{" "}
+          {gameMode === "TURN_ROTATION" ? "Turn Rotation" : "Free Rotation"}
+        </p>
       )}
 
       {gameStarted && gameMode === "TURN_ROTATION" && (

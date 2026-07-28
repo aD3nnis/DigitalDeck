@@ -50,6 +50,14 @@ public class SessionService {
         String raw = redisTemplate.opsForValue().get("session:" + sessionId + ":gameMode");
         return GameMode.from(raw);
     }
+    
+    public void setGameMode(String sessionId, GameMode gameMode) {
+        redisTemplate.opsForValue().set(
+                "session:" + sessionId + ":gameMode",
+                gameMode.name(),
+                SESSION_TTL
+        );
+    }
 
     public Optional<String> resolveCode(String code) {
         String sessionId = redisTemplate.opsForValue().get("code:" + code.trim().toUpperCase());
@@ -105,4 +113,5 @@ public class SessionService {
     public boolean gameStarted(String sessionId) {
         return Boolean.TRUE.equals(redisTemplate.hasKey("session:" + sessionId + ":deck"));
     }
+    
 }
