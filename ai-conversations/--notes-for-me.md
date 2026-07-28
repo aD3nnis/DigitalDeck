@@ -40,3 +40,8 @@ Across this refresh thread, the split looks like this:
 - **Cursor:** Also make reconnect structurally safe against null/stale identity (gate / pass args), especially after the SSR-driven `useEffect` change.
 - **Both on turns:** Don’t change “refresh vs disconnect” on the client — delay the server’s disconnect leave so a quick reconnect doesn’t skip your turn.
   
+
+
+
+### Note for refresh 
+playerId is briefly an empty string during any server-render pass before hydration. That's invisible in normal browser use (you never see the server-rendered HTML directly interact with anything), so it shouldn't cause a visible bug — just worth knowing it's there if you ever see a flash of "wrong" initial state before hydration settles.
