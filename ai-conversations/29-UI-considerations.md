@@ -344,3 +344,4 @@ Rough gate:
 {sessionId && !gameStarted && playerId !== hostId && (
   <p>Mode: {gameMode === "TURN_ROTATION" ? "Turn Rotation" : "Free Rotation"}</p>
 )}
+

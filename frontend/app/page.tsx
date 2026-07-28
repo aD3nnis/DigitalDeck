@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Client, StompSubscription } from "@stomp/stompjs";
-
+import HomeScreen from "../components/HomeScreen";
+import LobbyScreen from "../components/LobbyScreen";
+import SessionScreen from "../components/SessionScreen";
 
 export default function Home() {
   const [messages, setMessages] = useState<string[]>([]);
@@ -240,124 +242,48 @@ export default function Home() {
     </section>
   );
 
+  if (!sessionId) {
+    return (
+      <HomeScreen
+        displayName={displayName}
+        joinCodeInput={joinCodeInput}
+        gameMode={gameMode}
+        clientReady={!!client}
+        onDisplayNameChange={setDisplayName}
+        onJoinCodeChange={setJoinCodeInput}
+        onGameModeChange={setGameMode}
+        onCreate={createAndJoin}
+        onJoin={joinExisting}
+      />
+    );
+  }
+  
+  if (!gameStarted) {
+    return (
+      <LobbyScreen
+        code={code}
+        roster={roster}
+        playerId={playerId}
+        hostId={hostId}
+        gameMode={gameMode}
+        onUpdateGameMode={updateGameMode}
+        onStart={startGame}
+        onLeave={leaveSession}
+      />
+    );
+  }
+  
   return (
-    <main>
-      <section>
-        <button onClick={createAndJoin} disabled={!client}>
-          Create &amp; join session
-        </button>
-        {code && <p>Session code: {code}</p>}
-      </section>
-
-      <section>
-        <input
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          placeholder="Your name"
-        />
-        <input
-          value={joinCodeInput}
-          onChange={(e) => setJoinCodeInput(e.target.value)}
-          placeholder="Enter code"
-        />
-        <button onClick={joinExisting} disabled={!client}>
-          Join session
-        </button>
-      </section>
-      {sessionId && (
-        <>
-          {gameStarted && <h2>Players in session</h2>}
-          <ul>
-            {Object.entries(roster).map(([id, name]) => (
-              <li key={id}>
-                {name} <small>({id})</small>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {sessionId && playerId === hostId && !gameStarted && (
-        <button onClick={startGame}>Start game</button>
-      )}
-      <br />
-      {/* Home — pick mode before create; local state only */}
-      {!sessionId && (
-        <section>
-          <label>
-            <input
-              type="radio"
-              name="gameMode"
-              checked={gameMode === "TURN_ROTATION"}
-              onChange={() => setGameMode("TURN_ROTATION")}
-            />
-            Turn Rotation
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="gameMode"
-              checked={gameMode === "FREE_ROTATION"}
-              onChange={() => setGameMode("FREE_ROTATION")}
-            />
-            Free Rotation
-          </label>
-        </section>
-      )}
-
-      {/* Lobby — host can still change (calls PATCH) */}
-      {sessionId && !gameStarted && playerId === hostId && (
-        <section>
-          <label>
-            <input
-              type="radio"
-              name="gameMode"
-              checked={gameMode === "TURN_ROTATION"}
-              onChange={() => updateGameMode("TURN_ROTATION")}
-            />
-            Turn Rotation
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="gameMode"
-              checked={gameMode === "FREE_ROTATION"}
-              onChange={() => updateGameMode("FREE_ROTATION")}
-            />
-            Free Rotation
-          </label>
-        </section>
-      )}
-
-      {/* Lobby — everyone else sees mode, can’t edit */}
-      {sessionId && !gameStarted && playerId !== hostId && (
-        <p>
-          Mode:{" "}
-          {gameMode === "TURN_ROTATION" ? "Turn Rotation" : "Free Rotation"}
-        </p>
-      )}
-
-      {gameStarted && gameMode === "TURN_ROTATION" && (
-        <p>
-          Current turn: {currentTurn ? roster[currentTurn] ?? currentTurn : "—"}
-          {currentTurn === playerId && " (this is you!)"}
-        </p>
-      )}
-
-      {sessionId && gameStarted && (
-        gameMode === "FREE_ROTATION" || currentTurn === playerId
-      ) && (
-        <button onClick={drawCard}>Draw card</button>
-      )}
-      {gameStarted && <p>Cards remaining: {remaining}</p>}
-      {gameStarted && <h2>Your hand</h2>}
-      {gameStarted && <ul>
-        {hand.map((card, i) => (
-          <li key={i}>{card}</li>
-        ))}
-      </ul>}
-      {sessionId && (
-        <button onClick={leaveSession}>Leave session</button>
-      )}
-    </main>
+    <SessionScreen
+      roster={roster}
+      playerId={playerId}
+      gameMode={gameMode}
+      currentTurn={currentTurn}
+      hand={hand}
+      remaining={remaining}
+      onDraw={drawCard}
+      onLeave={leaveSession}
+    />
   );
+
 }

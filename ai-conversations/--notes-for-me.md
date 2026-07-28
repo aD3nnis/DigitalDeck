@@ -16,6 +16,12 @@ curl -X POST http://localhost:8080/api/sessions/<sessionId>/draw \
   -d '{"playerId": "not-a-real-player"}'
 
 
+## Java stale in project
+Command Palette (Cmd+Shift+P):
+
+Java: Clean Java Language Server Workspace — then reload when prompted
+
+
 ## Claude vs Cursor disagreement
 Across this refresh thread, the split looks like this:
 

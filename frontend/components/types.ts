@@ -1,0 +1,1 @@
+export type GameMode = "TURN_ROTATION" | "FREE_ROTATION";
