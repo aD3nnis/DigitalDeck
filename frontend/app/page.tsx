@@ -29,6 +29,8 @@ export default function Home() {
     setGameMode(next);
     setDiscardMode((prev) => coerceDiscardMode(next, prev));
   };
+  const [deckCount, setDeckCount] = useState(1);
+
   useEffect(() => {
     if (!statusMessage) return;
     const id = setTimeout(() => setStatusMessage(null), 4000);
@@ -101,6 +103,9 @@ export default function Home() {
           if (event.payload.gameMode) setGameMode(event.payload.gameMode);
           if (event.payload.discardMode) setDiscardMode(event.payload.discardMode);
           setTopDiscard(event.payload.topDiscard ?? null);
+          if (event.payload.deckCount != null) setDeckCount(event.payload.deckCount);
+        } else if (event.type === "DECK_COUNT_CHANGED") {
+          setDeckCount(event.payload.deckCount);
         } else if (event.type === "DISCARD_MODE_CHANGED") {
           setDiscardMode(event.payload.discardMode);
         } else if (event.type === "CARD_DISCARDED") {
@@ -134,8 +139,9 @@ export default function Home() {
     const createRes = await fetch("http://localhost:8080/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameMode, discardMode }),
+      body: JSON.stringify({ gameMode, discardMode, deckCount }),
     });
+
     const { code: newCode, gameMode: createdMode, discardMode: createdDiscard } =
       await createRes.json();
     setGameMode(createdMode);
@@ -296,6 +302,24 @@ export default function Home() {
     setDiscardMode(next);
   };
 
+  const updateDeckCount = async (next: number) => {
+    if (!sessionId) return;
+    const res = await fetch(
+      `http://localhost:8080/api/sessions/${sessionId}/deck-count`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deckCount: next, playerId }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error ?? "Could not update deck count");
+      return;
+    }
+    setDeckCount(next);
+  };
+
   if (!sessionId) {
     return (
       <HomeScreen
@@ -326,7 +350,10 @@ export default function Home() {
         onUpdateGameMode={updateGameMode}
         onStart={startGame}
         onLeave={leaveSession}
-        onUpdateDiscardMode={updateDiscardMode}      />
+        onUpdateDiscardMode={updateDiscardMode}
+        onUpdateDeckCount={updateDeckCount}
+        deckCount={deckCount}
+      />
     );
   }
   

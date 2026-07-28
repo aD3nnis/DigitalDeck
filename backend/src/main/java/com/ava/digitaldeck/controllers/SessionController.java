@@ -16,6 +16,7 @@ import com.ava.digitaldeck.model.UpdateGameModeRequest;
 import com.ava.digitaldeck.model.DiscardMode;
 import com.ava.digitaldeck.model.DiscardRequest;
 import com.ava.digitaldeck.model.UpdateDiscardModeRequest;
+import com.ava.digitaldeck.model.UpdateDeckCountRequest;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -42,14 +43,16 @@ public class SessionController {
     }
 
     @PostMapping
-    public Map<String, String> createSession(@RequestBody(required = false) CreateSessionRequest request) {
+    public Map<String, Object> createSession(@RequestBody(required = false) CreateSessionRequest request) {
         GameMode mode = GameMode.from(request == null ? null : request.gameMode());
         DiscardMode discardMode = DiscardMode.from(request == null ? null : request.discardMode());
-        String code = sessionService.createSession(mode, discardMode);
+        int deckCount = SessionService.clampDeckCount(request == null ? null : request.deckCount());
+        String code = sessionService.createSession(mode, discardMode, deckCount);
         return Map.of(
                 "code", code,
                 "gameMode", mode.name(),
-                "discardMode", discardMode.name()
+                "discardMode", discardMode.name(),
+                "deckCount", deckCount
         );
     }
 
@@ -72,7 +75,8 @@ public class SessionController {
             return ResponseEntity.status(409).body(Map.of("error", "game already started"));
         }
     
-        deckService.initializeDeck(sessionId);
+        int deckCount = sessionService.getDeckCount(sessionId);
+        deckService.initializeDeck(sessionId, deckCount);
     
         GameMode mode = sessionService.getGameMode(sessionId);
         String currentPlayer = null;
@@ -254,6 +258,36 @@ public class SessionController {
                         Map.of("discardMode", discardMode.name())));
 
         return ResponseEntity.ok(Map.of("discardMode", discardMode.name()));
+    }
+    @PatchMapping("/{sessionId}/deck-count")
+    public ResponseEntity<?> updateDeckCount(
+        @PathVariable String sessionId,
+        @RequestBody UpdateDeckCountRequest request) {
+
+    if (!sessionService.sessionExists(sessionId)) {
+        return ResponseEntity.notFound().build();
+    }
+
+    Optional<String> host = sessionService.getHost(sessionId);
+    if (host.isEmpty() || !host.get().equals(request.playerId())) {
+        return ResponseEntity.status(403)
+                .body(Map.of("error", "only the host can change deck count"));
+    }
+
+    if (sessionService.gameStarted(sessionId)) {
+        return ResponseEntity.status(409)
+                .body(Map.of("error", "game already started"));
+    }
+
+    int deckCount = SessionService.clampDeckCount(request.deckCount());
+    sessionService.setDeckCount(sessionId, deckCount);
+
+    messagingTemplate.convertAndSend(
+            "/topic/session/" + sessionId,
+            new SessionEvent("DECK_COUNT_CHANGED", sessionId,
+                    Map.of("deckCount", deckCount)));
+
+    return ResponseEntity.ok(Map.of("deckCount", deckCount));
     }
 
 

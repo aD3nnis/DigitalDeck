@@ -31,7 +31,7 @@ public class SessionService {
         this.redisTemplate = redisTemplate;
     }
 
-    public String createSession(GameMode gameMode, DiscardMode discardMode) {
+    public String createSession(GameMode gameMode, DiscardMode discardMode, int deckCount) {
         String sessionId = UUID.randomUUID().toString();
         String code = generateUniqueCode();
     
@@ -47,8 +47,40 @@ public class SessionService {
                 discardMode.name(),
                 SESSION_TTL
         );
+        redisTemplate.opsForValue().set(
+                "session:" + sessionId + ":deckCount",
+                String.valueOf(clampDeckCount(deckCount)),
+                SESSION_TTL
+        );
     
         return code;
+    }
+    
+    public int getDeckCount(String sessionId) {
+        String raw = redisTemplate.opsForValue().get("session:" + sessionId + ":deckCount");
+        return parseDeckCount(raw);
+    }
+    
+    public void setDeckCount(String sessionId, int deckCount) {
+        redisTemplate.opsForValue().set(
+                "session:" + sessionId + ":deckCount",
+                String.valueOf(clampDeckCount(deckCount)),
+                SESSION_TTL
+        );
+    }
+    
+    public static int clampDeckCount(Integer value) {
+        if (value == null) return 1;
+        return Math.max(1, Math.min(3, value));
+    }
+    
+    private static int parseDeckCount(String raw) {
+        if (raw == null || raw.isBlank()) return 1;
+        try {
+            return clampDeckCount(Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException e) {
+            return 1;
+        }
     }
     
     public DiscardMode getDiscardMode(String sessionId) {

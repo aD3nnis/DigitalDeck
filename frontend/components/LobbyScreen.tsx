@@ -9,8 +9,10 @@ type Props = {
   hostId: string | null;
   gameMode: GameMode;
   discardMode: DiscardMode;
+  deckCount: number;
   onUpdateGameMode: (mode: GameMode) => void;
   onUpdateDiscardMode: (mode: DiscardMode) => void;
+  onUpdateDeckCount: (count: number) => void;
   onStart: () => void;
   onLeave: () => void;
 };
@@ -22,11 +24,12 @@ export default function LobbyScreen({
   hostId,
   gameMode,
   discardMode,
+  deckCount,
   onUpdateGameMode,
   onUpdateDiscardMode,
   onStart,
   onLeave,
-
+  onUpdateDeckCount,
 }: Props) {
   const isHost = playerId === hostId;
 
@@ -110,7 +113,24 @@ export default function LobbyScreen({
           {discardMode === "DISCARD_OFF" ? "Discard Off" : discardMode === "TURN_DISCARD" ? "Turn Discard" : "Free Discard"}
         </p>
       )}
-
+      {isHost ? (
+        <section>
+          <p>Decks</p>
+          {[1, 2, 3].map((n) => (
+            <label key={n}>
+              <input
+                type="radio"
+                name="deckCount"
+                checked={deckCount === n}
+                onChange={() => onUpdateDeckCount(n)}
+              />
+              {n}
+            </label>
+          ))}
+        </section>
+      ) : (
+        <p>Decks: {deckCount}</p>
+      )}
       {isHost && <button onClick={onStart}>Start game</button>}
       <button onClick={onLeave}>Leave session</button>
     </main>

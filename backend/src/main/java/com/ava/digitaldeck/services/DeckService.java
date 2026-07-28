@@ -21,11 +21,14 @@ public class DeckService {
         this.redisTemplate = redisTemplate;
     }
 
-    public void initializeDeck(String sessionId) {
+    public void initializeDeck(String sessionId, int deckCount) {
+        int packs = Math.max(1, Math.min(3, deckCount));
         List<String> cards = new ArrayList<>();
-        for (String suit : SUITS) {
-            for (String rank : RANKS) {
-                cards.add(rank + suit);
+        for (int i = 0; i < packs; i++) {
+            for (String suit : SUITS) {
+                for (String rank : RANKS) {
+                    cards.add(rank + suit);
+                }
             }
         }
         Collections.shuffle(cards);
