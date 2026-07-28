@@ -84,15 +84,17 @@ export default function LobbyScreen({
           />
           Discard Off
         </label>
-        <label>
-          <input
-            type="radio"
-            name="discardMode"
-            checked={discardMode === "TURN_DISCARD"}
-            onChange={() => onUpdateDiscardMode("TURN_DISCARD")}
-          />
-          Turn Discard
-        </label>
+        {gameMode === "TURN_ROTATION" && (
+          <label>
+            <input
+              type="radio"
+              name="discardMode"
+              checked={discardMode === "TURN_DISCARD"}
+              onChange={() => onUpdateDiscardMode("TURN_DISCARD")}
+            />
+            Turn Discard
+          </label>
+        )}
         <label>
           <input
             type="radio"

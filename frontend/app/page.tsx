@@ -5,7 +5,9 @@ import { Client, StompSubscription } from "@stomp/stompjs";
 import HomeScreen from "../components/HomeScreen";
 import LobbyScreen from "../components/LobbyScreen";
 import SessionScreen from "../components/SessionScreen";
-import type { DiscardMode } from "../components/types";
+import type { DiscardMode, GameMode } from "../components/types";
+import { coerceDiscardMode } from "../components/types";
+
 
 export default function Home() {
   const [messages, setMessages] = useState<string[]>([]);
@@ -23,7 +25,10 @@ export default function Home() {
   const [discardMode, setDiscardMode] = useState<DiscardMode>("DISCARD_OFF");
   const [topDiscard, setTopDiscard] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-
+  const handleGameModeChange = (next: GameMode) => {
+    setGameMode(next);
+    setDiscardMode((prev) => coerceDiscardMode(next, prev));
+  };
   useEffect(() => {
     if (!statusMessage) return;
     const id = setTimeout(() => setStatusMessage(null), 4000);
@@ -190,8 +195,13 @@ export default function Home() {
       alert(err.error ?? "Could not update mode");
       return;
     }
-    // optimistic optional; WS will confirm
+  
     setGameMode(next);
+  
+    const nextDiscard = coerceDiscardMode(next, discardMode);
+    if (nextDiscard !== discardMode) {
+      await updateDiscardMode(nextDiscard);
+    }
   };
 
   const drawCard = async () => {
@@ -296,7 +306,7 @@ export default function Home() {
         discardMode={discardMode}
         onDisplayNameChange={setDisplayName}
         onJoinCodeChange={setJoinCodeInput}
-        onGameModeChange={setGameMode}
+        onGameModeChange={handleGameModeChange}
         onCreate={createAndJoin}
         onJoin={joinExisting}
         onDiscardModeChange={setDiscardMode}
