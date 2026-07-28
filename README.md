@@ -37,10 +37,23 @@ Built as a hands-on project to practice the Java / Spring Boot / React / Redis /
 
 ---
 
+## How this project was built (not vibe coding)
+
+I use AI (Cursor and Claude) as a **thinking partner**, not as an autopilot that writes and lands the code for me.
+
+- Agents stay in **ask mode** — they explain options, sketch designs, and help debug; they do **not** edit the codebase.
+- I make every file and code change myself, so I have to understand the APIs, Redis keys, WebSocket contract, and edge cases enough to type them in.
+- The [`ai-conversations/`](ai-conversations/) folder is a running log of those sessions (brainstorms, step-by-step build notes, bug hunts). It shows the decision trail behind the app, not a dump of generated PRs.
+
+That keeps the project hands-on: AI accelerates research and architecture talk; ownership of plugging in the code and verifying its contents stays with me.
+
+---
+
 ## Project structure
 
 ```text
 DigitalDeck/
+├── ai-conversations/ # Logged Cursor / Claude ask-mode sessions
 ├── backend/          # Spring Boot API + WebSocket server
 ├── frontend/         # Next.js (React + TypeScript) client
 └── docker-compose.yml # Postgres 16 + Redis 7
