@@ -2,6 +2,7 @@
 
 import type { DiscardMode, GameMode } from "./types";
 
+
 type Props = {
   code: string | null;
   roster: Record<string, string>;
@@ -10,13 +11,14 @@ type Props = {
   gameMode: GameMode;
   discardMode: DiscardMode;
   deckCount: number;
+  cardsPerPlayer: number;
   onUpdateGameMode: (mode: GameMode) => void;
   onUpdateDiscardMode: (mode: DiscardMode) => void;
   onUpdateDeckCount: (count: number) => void;
+  onUpdateCardsPerPlayer: (count: number) => void;
   onStart: () => void;
   onLeave: () => void;
 };
-
 export default function LobbyScreen({
   code,
   roster,
@@ -25,13 +27,19 @@ export default function LobbyScreen({
   gameMode,
   discardMode,
   deckCount,
+  cardsPerPlayer,
   onUpdateGameMode,
   onUpdateDiscardMode,
+  onUpdateDeckCount,
+  onUpdateCardsPerPlayer,
   onStart,
   onLeave,
-  onUpdateDeckCount,
 }: Props) {
   const isHost = playerId === hostId;
+  const playerCount = Object.keys(roster).length;
+  const needed = playerCount * cardsPerPlayer;
+  const available = deckCount * 52;
+  const canStart = needed <= available;
 
   return (
     <main>
@@ -131,7 +139,34 @@ export default function LobbyScreen({
       ) : (
         <p>Decks: {deckCount}</p>
       )}
-      {isHost && <button onClick={onStart}>Start game</button>}
+            {isHost ? (
+        <section>
+          <label>
+            Cards each at start:{" "}
+            <input
+              type="number"
+              min={0}
+              max={52}
+              value={cardsPerPlayer}
+              onChange={(e) =>
+                onUpdateCardsPerPlayer(Number(e.target.value) || 0)
+              }
+            />
+          </label>
+          <p>
+            Need {needed} / {available} cards
+            {!canStart && " — lower cards each, add a deck, or wait for fewer players"}
+          </p>
+        </section>
+      ) : (
+        <p>Cards each at start: {cardsPerPlayer}</p>
+      )}
+      {isHost && (
+        <button onClick={onStart} disabled={!canStart}>
+          Start game
+        </button>
+      )}
+
       <button onClick={onLeave}>Leave session</button>
     </main>
   );

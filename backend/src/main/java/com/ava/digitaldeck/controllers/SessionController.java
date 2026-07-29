@@ -17,6 +17,7 @@ import com.ava.digitaldeck.model.DiscardMode;
 import com.ava.digitaldeck.model.DiscardRequest;
 import com.ava.digitaldeck.model.UpdateDiscardModeRequest;
 import com.ava.digitaldeck.model.UpdateDeckCountRequest;
+import com.ava.digitaldeck.model.UpdateCardsPerPlayerRequest;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -41,18 +42,20 @@ public class SessionController {
         this.messagingTemplate = messagingTemplate;
         this.turnService = turnService;
     }
-
     @PostMapping
     public Map<String, Object> createSession(@RequestBody(required = false) CreateSessionRequest request) {
         GameMode mode = GameMode.from(request == null ? null : request.gameMode());
         DiscardMode discardMode = DiscardMode.from(request == null ? null : request.discardMode());
         int deckCount = SessionService.clampDeckCount(request == null ? null : request.deckCount());
-        String code = sessionService.createSession(mode, discardMode, deckCount);
+        int cardsPerPlayer = SessionService.clampCardsPerPlayer(
+                request == null ? null : request.cardsPerPlayer());
+        String code = sessionService.createSession(mode, discardMode, deckCount, cardsPerPlayer);
         return Map.of(
                 "code", code,
                 "gameMode", mode.name(),
                 "discardMode", discardMode.name(),
-                "deckCount", deckCount
+                "deckCount", deckCount,
+                "cardsPerPlayer", cardsPerPlayer
         );
     }
 
@@ -75,29 +78,50 @@ public class SessionController {
             return ResponseEntity.status(409).body(Map.of("error", "game already started"));
         }
     
+        if (!sessionService.canDealStartingHands(sessionId)) {
+            int players = sessionService.getPlayerOrder(sessionId).size();
+            int cardsPerPlayer = sessionService.getCardsPerPlayer(sessionId);
+            int deckCount = sessionService.getDeckCount(sessionId);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "not enough cards for starting hands",
+                    "players", players,
+                    "cardsPerPlayer", cardsPerPlayer,
+                    "needed", players * cardsPerPlayer,
+                    "available", deckCount * 52
+            ));
+        }
+        
         int deckCount = sessionService.getDeckCount(sessionId);
+        int cardsPerPlayer = sessionService.getCardsPerPlayer(sessionId);
         deckService.initializeDeck(sessionId, deckCount);
-    
+        deckService.dealStartingHands(
+                sessionId,
+                sessionService.getPlayerOrder(sessionId),
+                cardsPerPlayer
+        );
+        
         GameMode mode = sessionService.getGameMode(sessionId);
         String currentPlayer = null;
-    
+        
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                 new SessionEvent("DECK_INITIALIZED", sessionId, Map.of(
                         "remaining", deckService.remainingCount(sessionId),
-                        "gameMode", mode.name()
+                        "gameMode", mode.name(),
+                        "cardsPerPlayer", cardsPerPlayer
                 )));
-    
+        
         if (mode == GameMode.TURN_ROTATION) {
             turnService.startTurns(sessionId);
             currentPlayer = turnService.getCurrentPlayer(sessionId).orElse(null);
             messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                     new SessionEvent("TURN_CHANGED", sessionId, Map.of("playerId", currentPlayer)));
         }
-    
+        
         return ResponseEntity.ok(Map.of(
                 "remaining", deckService.remainingCount(sessionId),
                 "currentTurn", currentPlayer,
-                "gameMode", mode.name()
+                "gameMode", mode.name(),
+                "cardsPerPlayer", cardsPerPlayer
         ));
     }
 
@@ -288,6 +312,37 @@ public class SessionController {
                     Map.of("deckCount", deckCount)));
 
     return ResponseEntity.ok(Map.of("deckCount", deckCount));
+    }
+
+    @PatchMapping("/{sessionId}/cards-per-player")
+    public ResponseEntity<?> updateCardsPerPlayer(
+            @PathVariable String sessionId,
+            @RequestBody UpdateCardsPerPlayerRequest request) {
+
+        if (!sessionService.sessionExists(sessionId)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Optional<String> host = sessionService.getHost(sessionId);
+        if (host.isEmpty() || !host.get().equals(request.playerId())) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("error", "only the host can change cards per player"));
+        }
+
+        if (sessionService.gameStarted(sessionId)) {
+            return ResponseEntity.status(409)
+                    .body(Map.of("error", "game already started"));
+        }
+
+        int cardsPerPlayer = SessionService.clampCardsPerPlayer(request.cardsPerPlayer());
+        sessionService.setCardsPerPlayer(sessionId, cardsPerPlayer);
+
+        messagingTemplate.convertAndSend(
+                "/topic/session/" + sessionId,
+                new SessionEvent("CARDS_PER_PLAYER_CHANGED", sessionId,
+                        Map.of("cardsPerPlayer", cardsPerPlayer)));
+
+        return ResponseEntity.ok(Map.of("cardsPerPlayer", cardsPerPlayer));
     }
 
 

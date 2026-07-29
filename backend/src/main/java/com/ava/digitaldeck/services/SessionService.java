@@ -31,10 +31,9 @@ public class SessionService {
         this.redisTemplate = redisTemplate;
     }
 
-    public String createSession(GameMode gameMode, DiscardMode discardMode, int deckCount) {
+    public String createSession(GameMode gameMode, DiscardMode discardMode, int deckCount, int cardsPerPlayer) {
         String sessionId = UUID.randomUUID().toString();
         String code = generateUniqueCode();
-    
         redisTemplate.opsForValue().set("code:" + code, sessionId, SESSION_TTL);
         redisTemplate.opsForValue().set("session:" + sessionId + ":meta", "active", SESSION_TTL);
         redisTemplate.opsForValue().set(
@@ -52,9 +51,49 @@ public class SessionService {
                 String.valueOf(clampDeckCount(deckCount)),
                 SESSION_TTL
         );
-    
+        redisTemplate.opsForValue().set(
+                "session:" + sessionId + ":cardsPerPlayer",
+                String.valueOf(clampCardsPerPlayer(cardsPerPlayer)),
+                SESSION_TTL
+        );
         return code;
     }
+
+    public int getCardsPerPlayer(String sessionId) {
+        String raw = redisTemplate.opsForValue().get("session:" + sessionId + ":cardsPerPlayer");
+        return parseCardsPerPlayer(raw);
+    }
+    public void setCardsPerPlayer(String sessionId, int cardsPerPlayer) {
+        redisTemplate.opsForValue().set(
+                "session:" + sessionId + ":cardsPerPlayer",
+                String.valueOf(clampCardsPerPlayer(cardsPerPlayer)),
+                SESSION_TTL
+        );
+    }
+    public static int clampCardsPerPlayer(Integer value) {
+        if (value == null) return 0;
+        return Math.max(0, Math.min(52, value));
+    }
+    private static int parseCardsPerPlayer(String raw) {
+        if (raw == null || raw.isBlank()) return 0;
+        try {
+            return clampCardsPerPlayer(Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+    public List<String> getPlayerOrder(String sessionId) {
+        List<String> order = redisTemplate.opsForList()
+                .range("session:" + sessionId + ":playerOrder", 0, -1);
+        return order == null ? List.of() : order;
+    }
+    /** players × cardsPerPlayer ≤ deckCount × 52 */
+    public boolean canDealStartingHands(String sessionId) {
+        int players = getPlayerOrder(sessionId).size();
+        int need = players * getCardsPerPlayer(sessionId);
+        int have = getDeckCount(sessionId) * 52;
+        return need <= have;
+    }    
     
     public int getDeckCount(String sessionId) {
         String raw = redisTemplate.opsForValue().get("session:" + sessionId + ":deckCount");

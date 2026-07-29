@@ -86,6 +86,7 @@ public class SessionSocketController {
         gameState.put("gameMode", mode.name());
         gameState.put("discardMode", discardMode.name());
         gameState.put("deckCount", sessionService.getDeckCount(sessionId));
+        gameState.put("cardsPerPlayer", sessionService.getCardsPerPlayer(sessionId));
         gameState.put("remaining", started ? deckService.remainingCount(sessionId) : null);
         gameState.put("topDiscard",
                 started ? deckService.getTopDiscard(sessionId).orElse(null) : null);

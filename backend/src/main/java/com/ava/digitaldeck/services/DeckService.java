@@ -41,6 +41,34 @@ public class DeckService {
         redisTemplate.opsForList().rightPushAll(deckKey, cards);
         redisTemplate.expire(deckKey, SESSION_TTL);
     }
+
+    /**
+     * Deal cardsPerPlayer to each player from the top of the draw pile.
+     * Caller must ensure enough cards remain.
+     * Returns total cards dealt.
+     */
+    public int dealStartingHands(String sessionId, List<String> playerIds, int cardsPerPlayer) {
+        if (cardsPerPlayer <= 0 || playerIds == null || playerIds.isEmpty()) {
+            return 0;
+        }
+        String deckKey = "session:" + sessionId + ":deck";
+        int dealt = 0;
+        for (String playerId : playerIds) {
+            String handKey = "session:" + sessionId + ":hands:" + playerId;
+            // Clear any leftover hand key from a previous abandoned attempt
+            redisTemplate.delete(handKey);
+            for (int i = 0; i < cardsPerPlayer; i++) {
+                String card = redisTemplate.opsForList().leftPop(deckKey);
+                if (card == null) {
+                    return dealt;
+                }
+                redisTemplate.opsForList().rightPush(handKey, card);
+                dealt++;
+            }
+            redisTemplate.expire(handKey, SESSION_TTL);
+        }
+        return dealt;
+    }
     
     /** Moves card from hand → discard pile. Empty if card not in hand. */
     public Optional<String> discardCard(String sessionId, String playerId, String card) {

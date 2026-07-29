@@ -25,6 +25,7 @@ export default function Home() {
   const [discardMode, setDiscardMode] = useState<DiscardMode>("DISCARD_OFF");
   const [topDiscard, setTopDiscard] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [cardsPerPlayer, setCardsPerPlayer] = useState(0);
   const handleGameModeChange = (next: GameMode) => {
     setGameMode(next);
     setDiscardMode((prev) => coerceDiscardMode(next, prev));
@@ -96,6 +97,10 @@ export default function Home() {
           setGameStarted(true);
           setRemaining(event.payload.remaining);
           if (event.payload.gameMode) setGameMode(event.payload.gameMode);
+          if (event.payload.cardsPerPlayer != null) {
+            setCardsPerPlayer(event.payload.cardsPerPlayer);
+          }
+          rehydrateHand(resolvedSessionId); // dealt hands land here
         } else if (event.type === "GAME_STATE") {
           setGameStarted(event.payload.gameStarted);
           setRemaining(event.payload.remaining);
@@ -104,6 +109,14 @@ export default function Home() {
           if (event.payload.discardMode) setDiscardMode(event.payload.discardMode);
           setTopDiscard(event.payload.topDiscard ?? null);
           if (event.payload.deckCount != null) setDeckCount(event.payload.deckCount);
+          if (event.payload.cardsPerPlayer != null) {
+            setCardsPerPlayer(event.payload.cardsPerPlayer);
+          }
+          if (event.payload.gameStarted) {
+            rehydrateHand(resolvedSessionId);
+          }
+        } else if (event.type === "CARDS_PER_PLAYER_CHANGED") {
+            setCardsPerPlayer(event.payload.cardsPerPlayer);
         } else if (event.type === "DECK_COUNT_CHANGED") {
           setDeckCount(event.payload.deckCount);
         } else if (event.type === "DISCARD_MODE_CHANGED") {
@@ -139,13 +152,20 @@ export default function Home() {
     const createRes = await fetch("http://localhost:8080/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameMode, discardMode, deckCount }),
+      body: JSON.stringify({ gameMode, discardMode, deckCount, cardsPerPlayer }),
     });
 
-    const { code: newCode, gameMode: createdMode, discardMode: createdDiscard } =
-      await createRes.json();
+    const {
+      code: newCode,
+      gameMode: createdMode,
+      discardMode: createdDiscard,
+      deckCount: createdDecks,
+      cardsPerPlayer: createdCards,
+    } = await createRes.json();
     setGameMode(createdMode);
     setDiscardMode(createdDiscard);
+    if (createdDecks != null) setDeckCount(createdDecks);
+    if (createdCards != null) setCardsPerPlayer(createdCards);
     setCode(newCode);
 
     const resolveRes = await fetch(
@@ -180,10 +200,14 @@ export default function Home() {
 
   const startGame = async () => {
     if (!sessionId) return;
-
-    await fetch(`http://localhost:8080/api/sessions/${sessionId}/deck/init?playerId=${playerId}`, {
-      method: "POST",
-    });
+    const res = await fetch(
+      `http://localhost:8080/api/sessions/${sessionId}/deck/init?playerId=${playerId}`,
+      { method: "POST" }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error ?? "Could not start game");
+    }
   };
 
   const updateGameMode = async (next: "TURN_ROTATION" | "FREE_ROTATION") => {
@@ -320,6 +344,25 @@ export default function Home() {
     setDeckCount(next);
   };
 
+  const updateCardsPerPlayer = async (next: number) => {
+    if (!sessionId) return;
+    const clamped = Math.max(0, Math.min(52, next));
+    const res = await fetch(
+      `http://localhost:8080/api/sessions/${sessionId}/cards-per-player`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardsPerPlayer: clamped, playerId }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error ?? "Could not update cards per player");
+      return;
+    }
+    setCardsPerPlayer(clamped);
+  };
+
   if (!sessionId) {
     return (
       <HomeScreen
@@ -351,8 +394,10 @@ export default function Home() {
         onStart={startGame}
         onLeave={leaveSession}
         onUpdateDiscardMode={updateDiscardMode}
-        onUpdateDeckCount={updateDeckCount}
         deckCount={deckCount}
+        cardsPerPlayer={cardsPerPlayer}
+        onUpdateDeckCount={updateDeckCount}
+        onUpdateCardsPerPlayer={updateCardsPerPlayer}
       />
     );
   }
