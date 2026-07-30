@@ -11,6 +11,7 @@ import com.ava.digitaldeck.services.TurnService;
 import com.ava.digitaldeck.services.LobbySettingsService;
 import com.ava.digitaldeck.services.TurnActionPolicy;
 import com.ava.digitaldeck.services.GameStartService;
+
 import com.ava.digitaldeck.model.DrawRequest;
 import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.model.CreateSessionRequest;
@@ -167,7 +168,6 @@ public class SessionController {
         Map<String, Object> body = new HashMap<>();
         body.put("card", result.card());
         body.put("reshuffled", result.reshuffled());
-        body.put("remaining", deckService.remainingCount(sessionId));
         body.put("topDiscard", topDiscard);
         return ResponseEntity.ok(body);
     }

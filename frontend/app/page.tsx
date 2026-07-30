@@ -287,27 +287,36 @@ export default function Home() {
     sessionStorage.removeItem("digitalDeck.displayName");
   };
 
-  const discardCard = async (card: string) => {
-    if (!sessionId) return;
+  const discardCards = async (cards: string[]): Promise<boolean> => {
+    if (!sessionId || cards.length === 0) return false;
   
-    const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/discard`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, card }),
-    });
+    for (const card of cards) {
+      const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/discard`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId, card }),
+      });
   
-    if (!res.ok) {
-      const error = await res.json();
-      alert(error.error ?? "Could not discard");
-      return;
+      if (!res.ok) {
+        const error = await res.json();
+        alert(error.error ?? "Could not discard");
+        return false;
+      }
+  
+      setHand((prev) => {
+        const idx = prev.indexOf(card);
+        if (idx === -1) return prev;
+        return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+      });
     }
-  
-    setHand((prev) => {
-      const idx = prev.indexOf(card);
-      if (idx === -1) return prev;
-      return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
-    });
+    return true;
   };
+  
+  const playCards = async (_cards: string[]): Promise<boolean> => {
+    alert("Play is not implemented yet");
+    return false; // keep selection
+  };
+
   const updateDiscardMode = async (next: DiscardMode) => {
     if (!sessionId) return;
     const res = await fetch(
@@ -414,7 +423,8 @@ export default function Home() {
       onLeave={leaveSession}
       discardMode={discardMode}
       topDiscard={topDiscard}
-      onDiscard={discardCard}
+      onDiscard={discardCards}
+      onPlay={playCards}
       statusMessage={statusMessage}
     />
   );
