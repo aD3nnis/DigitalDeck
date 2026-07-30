@@ -27,6 +27,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -177,32 +178,47 @@ public class SessionController {
         if (!sessionService.sessionExists(sessionId)) {
             return ResponseEntity.notFound().build();
         }
-
+    
+        List<String> cards = request.cards();
+        if (cards == null || cards.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "no cards"));
+        }
+    
         TurnActionPolicy.Permit permit = turnActionPolicy.permitDiscard(sessionId, request.playerId());
         if (permit instanceof TurnActionPolicy.Permit.Denied(String error)) {
             return ResponseEntity.status(403).body(Map.of("error", error));
         }
         boolean advanceTurn = ((TurnActionPolicy.Permit.Allowed) permit).advanceTurnAfter();
-
-        Optional<String> discarded = deckService.discardCard(sessionId, request.playerId(), request.card());
+    
+        List<String> discarded = deckService.discardCards(sessionId, request.playerId(), cards);
         if (discarded.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "card not in hand"));
         }
-
+        if (discarded.size() != cards.size()) {
+            // optional: treat as hard failure; topDiscard already updated for partial
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "some cards not in hand",
+                    "discarded", discarded,
+                    "topDiscard", discarded.get(discarded.size() - 1)
+            ));
+        }
+    
+        String topDiscard = discarded.get(discarded.size() - 1);
+    
         Map<String, Object> payload = new HashMap<>();
         payload.put("playerId", request.playerId());
-        payload.put("card", discarded.get());
-        payload.put("topDiscard", discarded.get());
-
+        payload.put("cards", discarded);
+        payload.put("topDiscard", topDiscard);
+    
         messagingTemplate.convertAndSend(
                 "/topic/session/" + sessionId,
                 new SessionEvent("CARD_DISCARDED", sessionId, payload));
-
-        maybeAdvanceTurn(sessionId, advanceTurn);
-
+    
+        maybeAdvanceTurn(sessionId, advanceTurn); // once — only true for Turn Discard + Turn Rotation
+    
         return ResponseEntity.ok(Map.of(
-                "card", discarded.get(),
-                "topDiscard", discarded.get()
+                "cards", discarded,
+                "topDiscard", topDiscard
         ));
     }
 

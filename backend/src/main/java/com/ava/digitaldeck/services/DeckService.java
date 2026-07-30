@@ -88,6 +88,21 @@ public class DeckService {
         return Optional.of(card);
     }
     
+    /** Discards cards in order; last successful card is top of discard. */
+    public List<String> discardCards(String sessionId, String playerId, List<String> cards) {
+        if (cards == null || cards.isEmpty()) return List.of();
+
+        List<String> discarded = new ArrayList<>();
+        for (String card : cards) {
+            Optional<String> one = discardCard(sessionId, playerId, card);
+            if (one.isEmpty()) {
+                // stop on first missing card; already-discarded stay discarded
+                break;
+            }
+            discarded.add(one.get());
+        }
+        return discarded;
+    }
     /** Top of discard = most recently discarded (rightmost). */
     public Optional<String> getTopDiscard(String sessionId) {
         String discardKey = "session:" + sessionId + ":discard";

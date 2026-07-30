@@ -290,25 +290,28 @@ export default function Home() {
   const discardCards = async (cards: string[]): Promise<boolean> => {
     if (!sessionId || cards.length === 0) return false;
   
-    for (const card of cards) {
-      const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/discard`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId, card }),
-      });
+    const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/discard`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId, cards }), // last entry = top
+    });
   
-      if (!res.ok) {
-        const error = await res.json();
-        alert(error.error ?? "Could not discard");
-        return false;
-      }
-  
-      setHand((prev) => {
-        const idx = prev.indexOf(card);
-        if (idx === -1) return prev;
-        return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
-      });
+    if (!res.ok) {
+      const error = await res.json();
+      alert(error.error ?? "Could not discard");
+      // optional: rehydrateHand(sessionId) if partial discard is possible
+      return false;
     }
+  
+    const { cards: discarded } = await res.json();
+    setHand((prev) => {
+      let next = [...prev];
+      for (const card of discarded as string[]) {
+        const idx = next.indexOf(card);
+        if (idx !== -1) next = [...next.slice(0, idx), ...next.slice(idx + 1)];
+      }
+      return next;
+    });
     return true;
   };
   

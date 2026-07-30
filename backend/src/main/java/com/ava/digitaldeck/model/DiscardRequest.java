@@ -1,3 +1,5 @@
 package com.ava.digitaldeck.model;
 
-public record DiscardRequest(String playerId, String card) {}
+import java.util.List;
+
+public record DiscardRequest(String playerId, List<String> cards) {}
