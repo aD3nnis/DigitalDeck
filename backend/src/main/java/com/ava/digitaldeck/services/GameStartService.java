@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.List;
 
 @Service
 public class GameStartService {
@@ -66,13 +67,16 @@ public class GameStartService {
                     "available", deckCount * 52
             ));
         }
-
         int deckCount = sessionService.getDeckCount(sessionId);
         int cardsPerPlayer = sessionService.getCardsPerPlayer(sessionId);
         deckService.initializeDeck(sessionId, deckCount);
+        
+        List<String> playerOrder = sessionService.getPlayerOrder(sessionId);
+        deckService.clearAllPlayAreas(sessionId, playerOrder);
+        
         deckService.dealStartingHands(
                 sessionId,
-                sessionService.getPlayerOrder(sessionId),
+                playerOrder,
                 cardsPerPlayer
         );
 

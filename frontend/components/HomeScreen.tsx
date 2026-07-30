@@ -1,7 +1,6 @@
 "use client";
 
-import type { DiscardMode, GameMode } from "./types";
-
+import type { DiscardMode, GameMode, PlayMode } from "./types";
 
 type Props = {
   displayName: string;
@@ -9,12 +8,14 @@ type Props = {
   gameMode: GameMode;
   clientReady: boolean;
   discardMode: DiscardMode;
+  playMode: PlayMode;
   onDisplayNameChange: (name: string) => void;
   onJoinCodeChange: (code: string) => void;
   onGameModeChange: (mode: GameMode) => void;
   onCreate: () => void;
   onJoin: () => void;
   onDiscardModeChange: (mode: DiscardMode) => void;
+  onPlayModeChange: (mode: PlayMode) => void;
 };
 
 export default function HomeScreen({
@@ -29,6 +30,8 @@ export default function HomeScreen({
   onJoin,
   discardMode,
   onDiscardModeChange,
+  playMode,
+  onPlayModeChange,
 }: Props) {
   return (
     <main>
@@ -94,6 +97,39 @@ export default function HomeScreen({
             onChange={() => onDiscardModeChange("FREE_DISCARD")}
           />
           Free Discard
+        </label>
+      </section>
+      <section>
+        <label>
+          <input
+            type="radio"
+            name="playMode"
+            checked={playMode === "PLAY_OFF"}
+            onChange={() => onPlayModeChange("PLAY_OFF")}
+          />
+          Play Off
+        </label>
+
+        {gameMode === "TURN_ROTATION" && (
+          <label>
+            <input
+              type="radio"
+              name="playMode"
+              checked={playMode === "TURN_PLAY"}
+              onChange={() => onPlayModeChange("TURN_PLAY")}
+            />
+            Turn Play
+          </label>
+        )}
+
+        <label>
+          <input
+            type="radio"
+            name="playMode"
+            checked={playMode === "FREE_PLAY"}
+            onChange={() => onPlayModeChange("FREE_PLAY")}
+          />
+          Free Play
         </label>
       </section>
 

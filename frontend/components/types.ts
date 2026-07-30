@@ -19,3 +19,14 @@ export function coerceDiscardMode(
     ? discardMode
     : "DISCARD_OFF";
 }
+
+export type PlayMode = "PLAY_OFF" | "TURN_PLAY" | "FREE_PLAY";
+
+export function isPlayModeAllowed(gameMode: GameMode, playMode: PlayMode): boolean {
+  if (gameMode === "FREE_ROTATION" && playMode === "TURN_PLAY") return false;
+  return true;
+}
+
+export function coercePlayMode(gameMode: GameMode, playMode: PlayMode): PlayMode {
+  return isPlayModeAllowed(gameMode, playMode) ? playMode : "PLAY_OFF";
+}

@@ -22,6 +22,9 @@ import com.ava.digitaldeck.model.DiscardRequest;
 import com.ava.digitaldeck.model.UpdateDiscardModeRequest;
 import com.ava.digitaldeck.model.UpdateDeckCountRequest;
 import com.ava.digitaldeck.model.UpdateCardsPerPlayerRequest;
+import com.ava.digitaldeck.model.PlayMode;
+import com.ava.digitaldeck.model.PlayRequest;
+import com.ava.digitaldeck.model.UpdatePlayModeRequest;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -103,14 +106,19 @@ public class SessionController {
     public Map<String, Object> createSession(@RequestBody(required = false) CreateSessionRequest request) {
         GameMode mode = GameMode.from(request == null ? null : request.gameMode());
         DiscardMode discardMode = DiscardMode.from(request == null ? null : request.discardMode());
+        PlayMode playMode = PlayMode.from(request == null ? null : request.playMode());
         int deckCount = SessionService.clampDeckCount(request == null ? null : request.deckCount());
         int cardsPerPlayer = SessionService.clampCardsPerPlayer(
                 request == null ? null : request.cardsPerPlayer());
-        String code = sessionService.createSession(mode, discardMode, deckCount, cardsPerPlayer);
+
+
+                
+        String code = sessionService.createSession(mode, discardMode, playMode, deckCount, cardsPerPlayer);
         return Map.of(
                 "code", code,
                 "gameMode", mode.name(),
                 "discardMode", discardMode.name(),
+                "playMode", playMode.name(),
                 "deckCount", deckCount,
                 "cardsPerPlayer", cardsPerPlayer
         );
@@ -190,14 +198,20 @@ public class SessionController {
         }
         boolean advanceTurn = ((TurnActionPolicy.Permit.Allowed) permit).advanceTurnAfter();
     
-        List<String> discarded = deckService.discardCards(sessionId, request.playerId(), cards);
+        String source = request.source() == null ? "HAND" : request.source().trim().toUpperCase();
+        List<String> discarded = "PLAY".equals(source)
+                ? deckService.discardCardsFromPlay(sessionId, request.playerId(), cards)
+                : deckService.discardCards(sessionId, request.playerId(), cards);
+    
+        String notFoundError = "PLAY".equals(source) ? "card not in play" : "card not in hand";
+        String partialError = "PLAY".equals(source) ? "some cards not in play" : "some cards not in hand";
+    
         if (discarded.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "card not in hand"));
+            return ResponseEntity.badRequest().body(Map.of("error", notFoundError));
         }
         if (discarded.size() != cards.size()) {
-            // optional: treat as hard failure; topDiscard already updated for partial
             return ResponseEntity.badRequest().body(Map.of(
-                    "error", "some cards not in hand",
+                    "error", partialError,
                     "discarded", discarded,
                     "topDiscard", discarded.get(discarded.size() - 1)
             ));
@@ -209,16 +223,18 @@ public class SessionController {
         payload.put("playerId", request.playerId());
         payload.put("cards", discarded);
         payload.put("topDiscard", topDiscard);
+        payload.put("source", source);
     
         messagingTemplate.convertAndSend(
                 "/topic/session/" + sessionId,
                 new SessionEvent("CARD_DISCARDED", sessionId, payload));
     
-        maybeAdvanceTurn(sessionId, advanceTurn); // once — only true for Turn Discard + Turn Rotation
+        maybeAdvanceTurn(sessionId, advanceTurn);
     
         return ResponseEntity.ok(Map.of(
                 "cards", discarded,
-                "topDiscard", topDiscard
+                "topDiscard", topDiscard,
+                "source", source
         ));
     }
 
@@ -287,6 +303,59 @@ public class SessionController {
                 "CARDS_PER_PLAYER_CHANGED",
                 () -> Map.of("cardsPerPlayer", cardsPerPlayer),
                 () -> Map.of("cardsPerPlayer", cardsPerPlayer)
+        ));
+    }
+
+    @PostMapping("/{sessionId}/play")
+    public ResponseEntity<?> play(@PathVariable String sessionId, @RequestBody PlayRequest request) {
+        if (!sessionService.sessionExists(sessionId)) {
+            return ResponseEntity.notFound().build();
+        }
+        List<String> cards = request.cards();
+        if (cards == null || cards.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "no cards"));
+        }
+    
+        TurnActionPolicy.Permit permit = turnActionPolicy.permitPlay(sessionId, request.playerId());
+        if (permit instanceof TurnActionPolicy.Permit.Denied(String error)) {
+            return ResponseEntity.status(403).body(Map.of("error", error));
+        }
+    
+        List<String> played = deckService.playCards(sessionId, request.playerId(), cards);
+        if (played.isEmpty() || played.size() != cards.size()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "card not in hand", "played", played));
+        }
+    
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("playerId", request.playerId());
+        payload.put("cards", played);
+        payload.put("playArea", deckService.getPlayArea(sessionId, request.playerId()));
+    
+        messagingTemplate.convertAndSend(
+                "/topic/session/" + sessionId,
+                new SessionEvent("CARDS_PLAYED", sessionId, payload));
+    
+        // do NOT maybeAdvanceTurn
+        return ResponseEntity.ok(Map.of(
+                "cards", played,
+                "playArea", payload.get("playArea")
+        ));
+    }
+
+    @PatchMapping("/{sessionId}/play-mode")
+    public ResponseEntity<?> updatePlayMode(
+            @PathVariable String sessionId,
+            @RequestBody UpdatePlayModeRequest request) {
+    
+        PlayMode playMode = PlayMode.from(request.playMode());
+    
+        return toResponse(lobbySettingsService.updateWhileInLobby(
+                sessionId,
+                request.playerId(),
+                () -> sessionService.setPlayMode(sessionId, playMode),
+                "PLAY_MODE_CHANGED",
+                () -> Map.of("playMode", playMode.name()),
+                () -> Map.of("playMode", playMode.name())
         ));
     }
 

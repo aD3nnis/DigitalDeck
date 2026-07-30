@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import com.ava.digitaldeck.model.GameMode;
 import com.ava.digitaldeck.model.DiscardMode;
+import com.ava.digitaldeck.model.PlayMode;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -31,7 +32,7 @@ public class SessionService {
         this.redisTemplate = redisTemplate;
     }
 
-    public String createSession(GameMode gameMode, DiscardMode discardMode, int deckCount, int cardsPerPlayer) {
+    public String createSession(GameMode gameMode, DiscardMode discardMode, PlayMode playMode, int deckCount, int cardsPerPlayer) {
         String sessionId = UUID.randomUUID().toString();
         String code = generateUniqueCode();
         redisTemplate.opsForValue().set("code:" + code, sessionId, SESSION_TTL);
@@ -45,6 +46,11 @@ public class SessionService {
                 "session:" + sessionId + ":discardMode",
                 discardMode.name(),
                 SESSION_TTL
+        );
+        redisTemplate.opsForValue().set(
+        "session:" + sessionId + ":playMode",
+        playMode.name(),
+        SESSION_TTL
         );
         redisTemplate.opsForValue().set(
                 "session:" + sessionId + ":deckCount",
@@ -131,6 +137,18 @@ public class SessionService {
         redisTemplate.opsForValue().set(
                 "session:" + sessionId + ":discardMode",
                 discardMode.name(),
+                SESSION_TTL
+        );
+    }
+    public PlayMode getPlayMode(String sessionId) {
+        String raw = redisTemplate.opsForValue().get("session:" + sessionId + ":playMode");
+        return PlayMode.from(raw);
+    }
+    
+    public void setPlayMode(String sessionId, PlayMode playMode) {
+        redisTemplate.opsForValue().set(
+                "session:" + sessionId + ":playMode",
+                playMode.name(),
                 SESSION_TTL
         );
     }

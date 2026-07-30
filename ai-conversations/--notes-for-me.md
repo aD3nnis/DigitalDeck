@@ -49,5 +49,8 @@ Across this refresh thread, the split looks like this:
 
 
 
-### Note for refresh 
+## Note for refresh 
 playerId is briefly an empty string during any server-render pass before hydration. That's invisible in normal browser use (you never see the server-rendered HTML directly interact with anything), so it shouldn't cause a visible bug — just worth knowing it's there if you ever see a flash of "wrong" initial state before hydration settles.
+
+## Where I am working on UI 
+Between conversations 28-29 with ai I started to realize to move forward with more functionality I would need to think would how the game should visually look. I have started to build that in adobe illustrator and I am making software decisions that lean towards those designs. 

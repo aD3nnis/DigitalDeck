@@ -2,6 +2,7 @@ package com.ava.digitaldeck.services;
 
 import com.ava.digitaldeck.model.DiscardMode;
 import com.ava.digitaldeck.model.GameMode;
+import com.ava.digitaldeck.model.PlayMode;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -56,6 +57,17 @@ public class TurnActionPolicy {
                         && discardMode == DiscardMode.TURN_DISCARD;
 
         return new Permit.Allowed(advance);
+    }
+    /** Play never advances the turn. */
+    public Permit permitPlay(String sessionId, String playerId) {
+        PlayMode playMode = sessionService.getPlayMode(sessionId);
+        if (playMode == PlayMode.PLAY_OFF) {
+            return new Permit.Denied("play is disabled");
+        }
+        if (playMode == PlayMode.TURN_PLAY && !isCurrentPlayer(sessionId, playerId)) {
+            return new Permit.Denied("not your turn");
+        }
+        return new Permit.Allowed(false);
     }
 
     private boolean isCurrentPlayer(String sessionId, String playerId) {

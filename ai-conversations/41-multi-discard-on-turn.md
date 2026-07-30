@@ -216,3 +216,5 @@ Keep sending `selected.map(i => hand[i])` in click order. Last selected → last
 | Discard Off | Blocked by policy | — |
 
 I'm in Ask mode — switch to Agent if you want this applied in the repo.
+
+---

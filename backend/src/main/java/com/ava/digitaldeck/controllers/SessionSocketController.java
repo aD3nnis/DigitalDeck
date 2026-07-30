@@ -5,6 +5,7 @@ import com.ava.digitaldeck.model.LeaveRequest;
 import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.model.GameMode;
 import com.ava.digitaldeck.model.DiscardMode;
+import com.ava.digitaldeck.model.PlayMode;
 import com.ava.digitaldeck.services.SessionService;
 import com.ava.digitaldeck.services.TurnService;
 import com.ava.digitaldeck.services.DeckService;
@@ -82,6 +83,14 @@ public class SessionSocketController {
         DiscardMode discardMode = sessionService.getDiscardMode(sessionId);
         
         Map<String, Object> gameState = new HashMap<>();
+        PlayMode playMode = sessionService.getPlayMode(sessionId);
+        gameState.put("playMode", playMode.name());
+        if (started) {
+            gameState.put("playAreas",
+                    deckService.getAllPlayAreas(sessionId, sessionService.getPlayerOrder(sessionId)));
+        } else {
+            gameState.put("playAreas", Map.of());
+        }
         gameState.put("gameStarted", started);
         gameState.put("gameMode", mode.name());
         gameState.put("discardMode", discardMode.name());

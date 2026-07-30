@@ -1,7 +1,6 @@
 "use client";
 
-import type { DiscardMode, GameMode } from "./types";
-
+import type { DiscardMode, GameMode, PlayMode } from "./types";
 
 type Props = {
   code: string | null;
@@ -10,10 +9,12 @@ type Props = {
   hostId: string | null;
   gameMode: GameMode;
   discardMode: DiscardMode;
+  playMode: PlayMode;
   deckCount: number;
   cardsPerPlayer: number;
   onUpdateGameMode: (mode: GameMode) => void;
   onUpdateDiscardMode: (mode: DiscardMode) => void;
+  onUpdatePlayMode: (mode: PlayMode) => void;
   onUpdateDeckCount: (count: number) => void;
   onUpdateCardsPerPlayer: (count: number) => void;
   onStart: () => void;
@@ -28,8 +29,10 @@ export default function LobbyScreen({
   discardMode,
   deckCount,
   cardsPerPlayer,
+  playMode,
   onUpdateGameMode,
   onUpdateDiscardMode,
+  onUpdatePlayMode,
   onUpdateDeckCount,
   onUpdateCardsPerPlayer,
   onStart,
@@ -119,6 +122,48 @@ export default function LobbyScreen({
         <p>
           Discard Mode:{" "}
           {discardMode === "DISCARD_OFF" ? "Discard Off" : discardMode === "TURN_DISCARD" ? "Turn Discard" : "Free Discard"}
+        </p>
+      )}
+      {isHost ? (
+        <section>
+          <label>
+            <input
+              type="radio"
+              name="playMode"
+              checked={playMode === "PLAY_OFF"}
+              onChange={() => onUpdatePlayMode("PLAY_OFF")}
+            />
+            Play Off
+          </label>
+          {gameMode === "TURN_ROTATION" && (
+            <label>
+              <input
+                type="radio"
+                name="playMode"
+                checked={playMode === "TURN_PLAY"}
+                onChange={() => onUpdatePlayMode("TURN_PLAY")}
+              />
+              Turn Play
+            </label>
+          )}
+          <label>
+            <input
+              type="radio"
+              name="playMode"
+              checked={playMode === "FREE_PLAY"}
+              onChange={() => onUpdatePlayMode("FREE_PLAY")}
+            />
+            Free Play
+          </label>
+        </section>
+      ) : (
+        <p>
+          Play Mode:{" "}
+          {playMode === "PLAY_OFF"
+            ? "Play Off"
+            : playMode === "TURN_PLAY"
+              ? "Turn Play"
+              : "Free Play"}
         </p>
       )}
       {isHost ? (

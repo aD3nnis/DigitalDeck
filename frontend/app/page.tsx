@@ -5,8 +5,8 @@ import { Client, StompSubscription } from "@stomp/stompjs";
 import HomeScreen from "../components/HomeScreen";
 import LobbyScreen from "../components/LobbyScreen";
 import SessionScreen from "../components/SessionScreen";
-import type { DiscardMode, GameMode } from "../components/types";
-import { coerceDiscardMode } from "../components/types";
+import type { DiscardMode, GameMode, PlayMode } from "../components/types";
+import { coerceDiscardMode, coercePlayMode } from "../components/types";
 
 
 export default function Home() {
@@ -26,9 +26,12 @@ export default function Home() {
   const [topDiscard, setTopDiscard] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [cardsPerPlayer, setCardsPerPlayer] = useState(0);
+  const [playMode, setPlayMode] = useState<PlayMode>("PLAY_OFF");
+  const [playAreas, setPlayAreas] = useState<Record<string, string[]>>({});
   const handleGameModeChange = (next: GameMode) => {
     setGameMode(next);
     setDiscardMode((prev) => coerceDiscardMode(next, prev));
+    setPlayMode((prev) => coercePlayMode(next, prev));
   };
   const [deckCount, setDeckCount] = useState(1);
 
@@ -115,14 +118,33 @@ export default function Home() {
           if (event.payload.gameStarted) {
             rehydrateHand(resolvedSessionId);
           }
+          if (event.payload.playMode) setPlayMode(event.payload.playMode);
+          if (event.payload.playAreas) setPlayAreas(event.payload.playAreas);
         } else if (event.type === "CARDS_PER_PLAYER_CHANGED") {
             setCardsPerPlayer(event.payload.cardsPerPlayer);
         } else if (event.type === "DECK_COUNT_CHANGED") {
           setDeckCount(event.payload.deckCount);
         } else if (event.type === "DISCARD_MODE_CHANGED") {
           setDiscardMode(event.payload.discardMode);
+        } else if (event.type === "PLAY_MODE_CHANGED") {
+          setPlayMode(event.payload.playMode);
+        } else if (event.type === "CARDS_PLAYED") {
+          setPlayAreas((prev) => ({
+            ...prev,
+            [event.payload.playerId]: event.payload.playArea,
+          }));
         } else if (event.type === "CARD_DISCARDED") {
           setTopDiscard(event.payload.topDiscard);
+          if (event.payload.source === "PLAY" && event.payload.playerId) {
+            setPlayAreas((prev) => {
+              const area = [...(prev[event.payload.playerId] ?? [])];
+              for (const card of event.payload.cards as string[]) {
+                const idx = area.indexOf(card);
+                if (idx !== -1) area.splice(idx, 1);
+              }
+              return { ...prev, [event.payload.playerId]: area };
+            });
+          }
         } else if (event.type === "GAME_MODE_CHANGED") {
           setGameMode(event.payload.gameMode);
         } else if (event.type === "CARD_DRAWN") {
@@ -152,7 +174,7 @@ export default function Home() {
     const createRes = await fetch("http://localhost:8080/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameMode, discardMode, deckCount, cardsPerPlayer }),
+      body: JSON.stringify({ gameMode, discardMode, playMode, deckCount, cardsPerPlayer }),
     });
 
     const {
@@ -161,9 +183,11 @@ export default function Home() {
       discardMode: createdDiscard,
       deckCount: createdDecks,
       cardsPerPlayer: createdCards,
+      playMode: createdPlay,
     } = await createRes.json();
     setGameMode(createdMode);
     setDiscardMode(createdDiscard);
+    if (createdPlay) setPlayMode(createdPlay);
     if (createdDecks != null) setDeckCount(createdDecks);
     if (createdCards != null) setCardsPerPlayer(createdCards);
     setCode(newCode);
@@ -227,10 +251,15 @@ export default function Home() {
     }
   
     setGameMode(next);
-  
+
     const nextDiscard = coerceDiscardMode(next, discardMode);
     if (nextDiscard !== discardMode) {
       await updateDiscardMode(nextDiscard);
+    }
+    
+    const nextPlay = coercePlayMode(next, playMode);
+    if (nextPlay !== playMode) {
+      await updatePlayMode(nextPlay);
     }
   };
 
@@ -282,42 +311,78 @@ export default function Home() {
     setDiscardMode("DISCARD_OFF");
     setTopDiscard(null);
     setStatusMessage(null);
+    setPlayMode("PLAY_OFF");
+    setPlayAreas({});
 
     sessionStorage.removeItem("digitalDeck.sessionId");
     sessionStorage.removeItem("digitalDeck.displayName");
   };
 
-  const discardCards = async (cards: string[]): Promise<boolean> => {
+  const discardCards = async (
+    cards: string[],
+    source: "HAND" | "PLAY" = "HAND"
+  ): Promise<boolean> => {
     if (!sessionId || cards.length === 0) return false;
   
     const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/discard`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, cards }), // last entry = top
+      body: JSON.stringify({ playerId, cards, source }),
     });
   
     if (!res.ok) {
       const error = await res.json();
       alert(error.error ?? "Could not discard");
-      // optional: rehydrateHand(sessionId) if partial discard is possible
       return false;
     }
   
     const { cards: discarded } = await res.json();
+  
+    if (source === "HAND") {
+      setHand((prev) => {
+        let next = [...prev];
+        for (const card of discarded as string[]) {
+          const idx = next.indexOf(card);
+          if (idx !== -1) next = [...next.slice(0, idx), ...next.slice(idx + 1)];
+        }
+        return next;
+      });
+    } else {
+      setPlayAreas((prev) => {
+        let area = [...(prev[playerId] ?? [])];
+        for (const card of discarded as string[]) {
+          const idx = area.indexOf(card);
+          if (idx !== -1) area = [...area.slice(0, idx), ...area.slice(idx + 1)];
+        }
+        return { ...prev, [playerId]: area };
+      });
+    }
+    return true;
+  };
+  
+  const playCards = async (cards: string[]): Promise<boolean> => {
+    if (!sessionId || cards.length === 0) return false;
+    const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/play`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId, cards }),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      alert(error.error ?? "Could not play");
+      return false;
+    }
+    const { playArea } = await res.json();
     setHand((prev) => {
       let next = [...prev];
-      for (const card of discarded as string[]) {
+      for (const card of cards) {
         const idx = next.indexOf(card);
         if (idx !== -1) next = [...next.slice(0, idx), ...next.slice(idx + 1)];
       }
       return next;
     });
+    setPlayAreas((prev) => ({ ...prev, [playerId]: playArea }));
     return true;
-  };
-  
-  const playCards = async (_cards: string[]): Promise<boolean> => {
-    alert("Play is not implemented yet");
-    return false; // keep selection
   };
 
   const updateDiscardMode = async (next: DiscardMode) => {
@@ -336,6 +401,24 @@ export default function Home() {
       return;
     }
     setDiscardMode(next);
+  };
+
+  const updatePlayMode = async (next: PlayMode) => {
+    if (!sessionId) return;
+    const res = await fetch(
+      `http://localhost:8080/api/sessions/${sessionId}/play-mode`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playMode: next, playerId }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error ?? "Could not update play mode");
+      return;
+    }
+    setPlayMode(next);
   };
 
   const updateDeckCount = async (next: number) => {
@@ -389,6 +472,8 @@ export default function Home() {
         onCreate={createAndJoin}
         onJoin={joinExisting}
         onDiscardModeChange={setDiscardMode}
+        playMode={playMode}
+        onPlayModeChange={setPlayMode}
       />
     );
   }
@@ -402,7 +487,9 @@ export default function Home() {
         hostId={hostId}
         gameMode={gameMode}
         discardMode={discardMode}
+        playMode={playMode}
         onUpdateGameMode={updateGameMode}
+        onUpdatePlayMode={updatePlayMode}
         onStart={startGame}
         onLeave={leaveSession}
         onUpdateDiscardMode={updateDiscardMode}
@@ -425,6 +512,8 @@ export default function Home() {
       onDraw={drawCard}
       onLeave={leaveSession}
       discardMode={discardMode}
+      playMode={playMode}
+      playAreas={playAreas}
       topDiscard={topDiscard}
       onDiscard={discardCards}
       onPlay={playCards}

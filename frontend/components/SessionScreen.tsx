@@ -1,6 +1,6 @@
 "use client";
 
-import type { DiscardMode, GameMode } from "./types";
+import type { DiscardMode, GameMode, PlayMode } from "./types";
 import { useEffect, useState } from "react";
 
 type Props = {
@@ -11,14 +11,15 @@ type Props = {
   hand: string[];
   remaining: number | null;
   discardMode: DiscardMode;
+  playMode: PlayMode;
+  playAreas: Record<string, string[]>;
   topDiscard: string | null;
   onDraw: () => void;
   onLeave: () => void;
-  onDiscard: (cards: string[]) => Promise<boolean>;
+  onDiscard: (cards: string[], source: "HAND" | "PLAY") => Promise<boolean>;
   onPlay: (cards: string[]) => Promise<boolean>;
   statusMessage: string | null;
 };
-
 
 export default function SessionScreen({
   roster,
@@ -30,6 +31,8 @@ export default function SessionScreen({
   onDraw,
   onLeave,
   discardMode,
+  playMode,
+  playAreas,
   topDiscard,
   onDiscard,
   statusMessage,
@@ -40,24 +43,42 @@ export default function SessionScreen({
   const canDiscard =
     discardMode === "FREE_DISCARD" ||
     (discardMode === "TURN_DISCARD" && currentTurn === playerId);
-    const [selected, setSelected] = useState<number[]>([]);
+  const canPlay =
+    playMode === "FREE_PLAY" ||
+    (playMode === "TURN_PLAY" && currentTurn === playerId);
 
-    const toggle = (i: number) => {
-      setSelected((prev) => {
-        const at = prev.indexOf(i);
-        if (at !== -1) return prev.filter((_, j) => j !== at); // deselect
-        return [...prev, i]; // append = most recently selected
-      });
-    };
-    
-    const selectedCards = () => selected.map((i) => hand[i]);
-    
-    useEffect(() => {
-      setSelected([]);
-    }, [hand]);
-  
+  const [selected, setSelected] = useState<number[]>([]);
+  const [playSelected, setPlaySelected] = useState<number[]>([]);
+
+  const toggle = (i: number) => {
+    setSelected((prev) => {
+      const at = prev.indexOf(i);
+      if (at !== -1) return prev.filter((_, j) => j !== at);
+      return [...prev, i];
+    });
+  };
+
+  const togglePlay = (i: number) => {
+    setPlaySelected((prev) => {
+      const at = prev.indexOf(i);
+      if (at !== -1) return prev.filter((_, j) => j !== at);
+      return [...prev, i];
+    });
+  };
+
+  const selectedCards = () => selected.map((i) => hand[i]);
+  const myPlayArea = playAreas[playerId]; // string[] | undefined
+  const selectedPlayCards = () =>
+    playSelected.map((i) => (myPlayArea ?? [])[i]);
 
 
+  useEffect(() => {
+    setSelected([]);
+  }, [hand]);
+
+  useEffect(() => {
+    setPlaySelected([]);
+  }, [myPlayArea]);
 
   return (
     <main>
@@ -88,9 +109,70 @@ export default function SessionScreen({
       )}
       {statusMessage && <p>{statusMessage}</p>}
 
+      {playMode !== "PLAY_OFF" && (
+        <section>
+          <h2>Play areas</h2>
+          {Object.entries(roster).map(([id, name]) => {
+            const area = playAreas[id] ?? [];
+            const isMine = id === playerId;
+            return (
+              <div key={id}>
+                <h3>
+                  {name}
+                  {isMine ? " (you)" : ""}
+                </h3>
+                <ul>
+                  {area.length === 0 ? (
+                    <li>(empty)</li>
+                  ) : (
+                    area.map((card, i) => {
+                      if (!isMine) {
+                        return <li key={`${id}-${card}-${i}`}>{card}</li>;
+                      }
+                      const order = playSelected.indexOf(i);
+                      const isSelected = order !== -1;
+                      return (
+                        <li
+                          key={`${id}-${card}-${i}`}
+                          onClick={() => togglePlay(i)}
+                          style={{
+                            cursor: "pointer",
+                            fontWeight: isSelected ? "bold" : "normal",
+                            outline: isSelected
+                              ? "2px solid currentColor"
+                              : undefined,
+                          }}
+                        >
+                          {card}
+                          {isSelected && <span> ({order + 1})</span>}
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
+              </div>
+            );
+          })}
+
+          {discardMode !== "DISCARD_OFF" && (
+            <button
+              type="button"
+              disabled={!canDiscard || playSelected.length === 0}
+              onClick={async () => {
+                const cards = selectedPlayCards();
+                const ok = await onDiscard(cards, "PLAY");
+                if (ok) setPlaySelected([]);
+              }}
+            >
+              Discard from play
+            </button>
+          )}
+        </section>
+      )}
+
       <h2>Your hand</h2>
       <ul>
-      {hand.map((card, i) => {
+        {hand.map((card, i) => {
           const order = selected.indexOf(i);
           const isSelected = order !== -1;
 
@@ -110,22 +192,26 @@ export default function SessionScreen({
           );
         })}
       </ul>
-      {discardMode !== "DISCARD_OFF" && (
-        <div>
-           <button
+
+      <div>
+        {discardMode !== "DISCARD_OFF" && (
+          <button
             type="button"
             disabled={!canDiscard || selected.length === 0}
             onClick={async () => {
               const cards = selectedCards();
-              const ok = await onDiscard(cards);
+              const ok = await onDiscard(cards, "HAND");
               if (ok) setSelected([]);
             }}
           >
             Discard
           </button>
+        )}
+
+        {playMode !== "PLAY_OFF" && (
           <button
             type="button"
-            disabled={selected.length === 0}
+            disabled={!canPlay || selected.length === 0}
             onClick={async () => {
               const cards = selectedCards();
               const ok = await onPlay(cards);
@@ -134,8 +220,8 @@ export default function SessionScreen({
           >
             Play
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       <button onClick={onLeave}>Leave session</button>
     </main>
