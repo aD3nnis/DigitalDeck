@@ -20,5 +20,7 @@
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/ConnectionRegistry.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/DeckService.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/DisconnectGraceService.java
+/Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/LobbySettingsService.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/SessionService.java
+/Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/TurnActionPolicy.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/services/TurnService.java

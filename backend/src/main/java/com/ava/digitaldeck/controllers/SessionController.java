@@ -9,6 +9,7 @@ import com.ava.digitaldeck.services.SessionService;
 import com.ava.digitaldeck.services.DeckService;
 import com.ava.digitaldeck.services.TurnService;
 import com.ava.digitaldeck.services.LobbySettingsService;
+import com.ava.digitaldeck.services.TurnActionPolicy;
 import com.ava.digitaldeck.model.DrawRequest;
 import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.model.CreateSessionRequest;
@@ -36,6 +37,7 @@ public class SessionController {
     private final SimpMessagingTemplate messagingTemplate;
     private final TurnService turnService;
     private final LobbySettingsService lobbySettingsService;
+    private final TurnActionPolicy turnActionPolicy;
     private ResponseEntity<?> toResponse(LobbySettingsService.UpdateResult result) {
         return switch (result) {
             case LobbySettingsService.UpdateResult.NotFound() ->
@@ -49,13 +51,28 @@ public class SessionController {
         };
     }
 
+    private void maybeAdvanceTurn(String sessionId, boolean advance) {
+        if (!advance) return;
+        String nextPlayer = turnService.advanceTurn(sessionId).orElse(null);
+        messagingTemplate.convertAndSend(
+                "/topic/session/" + sessionId,
+                new SessionEvent("TURN_CHANGED", sessionId, Map.of("playerId", nextPlayer)));
+    }
+
     @Autowired
-    public SessionController(SessionService sessionService, DeckService deckService, SimpMessagingTemplate messagingTemplate, TurnService turnService, LobbySettingsService lobbySettingsService) {
+    public SessionController( SessionService sessionService, 
+        DeckService deckService, 
+        SimpMessagingTemplate messagingTemplate, 
+        TurnService turnService, 
+        LobbySettingsService lobbySettingsService, 
+        TurnActionPolicy turnActionPolicy) {
+
         this.sessionService = sessionService;
         this.deckService = deckService;
         this.messagingTemplate = messagingTemplate;
         this.turnService = turnService;
         this.lobbySettingsService = lobbySettingsService;
+        this.turnActionPolicy = turnActionPolicy;
     }
     @PostMapping
     public Map<String, Object> createSession(@RequestBody(required = false) CreateSessionRequest request) {
@@ -140,47 +157,45 @@ public class SessionController {
         ));
     }
 
+    @GetMapping("/{sessionId}/hand")
+    public ResponseEntity<?> getHand(@PathVariable String sessionId, @RequestParam String playerId) {
+        if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(Map.of("hand", deckService.getHand(sessionId, playerId)));
+    }
+
+
     @PostMapping("/{sessionId}/draw")
     public ResponseEntity<?> draw(@PathVariable String sessionId, @RequestBody DrawRequest request) {
-        if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
-    
-        GameMode mode = sessionService.getGameMode(sessionId);
-        DiscardMode discardMode = sessionService.getDiscardMode(sessionId);
-    
-        if (mode == GameMode.TURN_ROTATION) {
-            Optional<String> currentPlayer = turnService.getCurrentPlayer(sessionId);
-            if (currentPlayer.isEmpty() || !currentPlayer.get().equals(request.playerId())) {
-                return ResponseEntity.status(403).body(Map.of("error", "not your turn"));
-            }
+        if (!sessionService.sessionExists(sessionId)) {
+            return ResponseEntity.notFound().build();
         }
-    
+
+        TurnActionPolicy.Permit permit = turnActionPolicy.permitDraw(sessionId, request.playerId());
+        if (permit instanceof TurnActionPolicy.Permit.Denied(String error)) {
+            return ResponseEntity.status(403).body(Map.of("error", error));
+        }
+        boolean advanceTurn = ((TurnActionPolicy.Permit.Allowed) permit).advanceTurnAfter();
+
         Optional<DeckService.DrawResult> drawn = deckService.drawCard(sessionId, request.playerId());
         if (drawn.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "deck is empty"));
         }
-    
+
         DeckService.DrawResult result = drawn.get();
         String topDiscard = deckService.getTopDiscard(sessionId).orElse(null);
-    
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("playerId", request.playerId());
         payload.put("remaining", deckService.remainingCount(sessionId));
         payload.put("reshuffled", result.reshuffled());
         payload.put("topDiscard", topDiscard);
-    
+
         messagingTemplate.convertAndSend(
                 "/topic/session/" + sessionId,
                 new SessionEvent("CARD_DRAWN", sessionId, payload));
-    
-        boolean advanceOnDraw =
-                mode == GameMode.TURN_ROTATION && discardMode != DiscardMode.TURN_DISCARD;
-    
-        if (advanceOnDraw) {
-            String nextPlayer = turnService.advanceTurn(sessionId).orElse(null);
-            messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                    new SessionEvent("TURN_CHANGED", sessionId, Map.of("playerId", nextPlayer)));
-        }
-    
+
+        maybeAdvanceTurn(sessionId, advanceTurn);
+
         Map<String, Object> body = new HashMap<>();
         body.put("card", result.card());
         body.put("reshuffled", result.reshuffled());
@@ -189,29 +204,17 @@ public class SessionController {
         return ResponseEntity.ok(body);
     }
 
-    @GetMapping("/{sessionId}/hand")
-    public ResponseEntity<?> getHand(@PathVariable String sessionId, @RequestParam String playerId) {
-        if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(Map.of("hand", deckService.getHand(sessionId, playerId)));
-    }
-
     @PostMapping("/{sessionId}/discard")
     public ResponseEntity<?> discard(@PathVariable String sessionId, @RequestBody DiscardRequest request) {
-        if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
-
-        DiscardMode discardMode = sessionService.getDiscardMode(sessionId);
-        if (discardMode == DiscardMode.DISCARD_OFF) {
-            return ResponseEntity.status(403).body(Map.of("error", "discard is disabled"));
+        if (!sessionService.sessionExists(sessionId)) {
+            return ResponseEntity.notFound().build();
         }
 
-        GameMode mode = sessionService.getGameMode(sessionId);
-
-        if (discardMode == DiscardMode.TURN_DISCARD) {
-            Optional<String> currentPlayer = turnService.getCurrentPlayer(sessionId);
-            if (currentPlayer.isEmpty() || !currentPlayer.get().equals(request.playerId())) {
-                return ResponseEntity.status(403).body(Map.of("error", "not your turn"));
-            }
+        TurnActionPolicy.Permit permit = turnActionPolicy.permitDiscard(sessionId, request.playerId());
+        if (permit instanceof TurnActionPolicy.Permit.Denied(String error)) {
+            return ResponseEntity.status(403).body(Map.of("error", error));
         }
+        boolean advanceTurn = ((TurnActionPolicy.Permit.Allowed) permit).advanceTurnAfter();
 
         Optional<String> discarded = deckService.discardCard(sessionId, request.playerId(), request.card());
         if (discarded.isEmpty()) {
@@ -223,15 +226,11 @@ public class SessionController {
         payload.put("card", discarded.get());
         payload.put("topDiscard", discarded.get());
 
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
+        messagingTemplate.convertAndSend(
+                "/topic/session/" + sessionId,
                 new SessionEvent("CARD_DISCARDED", sessionId, payload));
 
-        // Turn Rotation + Turn Discard: discard ends the turn
-        if (mode == GameMode.TURN_ROTATION && discardMode == DiscardMode.TURN_DISCARD) {
-            String nextPlayer = turnService.advanceTurn(sessionId).orElse(null);
-            messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                    new SessionEvent("TURN_CHANGED", sessionId, Map.of("playerId", nextPlayer)));
-        }
+        maybeAdvanceTurn(sessionId, advanceTurn);
 
         return ResponseEntity.ok(Map.of(
                 "card", discarded.get(),
