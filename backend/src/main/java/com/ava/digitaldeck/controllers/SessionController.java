@@ -10,6 +10,7 @@ import com.ava.digitaldeck.services.DeckService;
 import com.ava.digitaldeck.services.TurnService;
 import com.ava.digitaldeck.services.LobbySettingsService;
 import com.ava.digitaldeck.services.TurnActionPolicy;
+import com.ava.digitaldeck.services.GameStartService;
 import com.ava.digitaldeck.model.DrawRequest;
 import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.model.CreateSessionRequest;
@@ -38,6 +39,9 @@ public class SessionController {
     private final TurnService turnService;
     private final LobbySettingsService lobbySettingsService;
     private final TurnActionPolicy turnActionPolicy;
+    private final GameStartService gameStartService;
+
+    // For PATCH / lobby settings
     private ResponseEntity<?> toResponse(LobbySettingsService.UpdateResult result) {
         return switch (result) {
             case LobbySettingsService.UpdateResult.NotFound() ->
@@ -47,6 +51,22 @@ public class SessionController {
             case LobbySettingsService.UpdateResult.Conflict(String error) ->
                     ResponseEntity.status(409).body(Map.of("error", error));
             case LobbySettingsService.UpdateResult.Ok(Object body) ->
+                    ResponseEntity.ok(body);
+        };
+    }
+
+    // For POST /deck/init
+    private ResponseEntity<?> toStartResponse(GameStartService.StartResult result) {
+        return switch (result) {
+            case GameStartService.StartResult.NotFound() ->
+                    ResponseEntity.notFound().build();
+            case GameStartService.StartResult.Forbidden(String error) ->
+                    ResponseEntity.status(403).body(Map.of("error", error));
+            case GameStartService.StartResult.Conflict(String error) ->
+                    ResponseEntity.status(409).body(Map.of("error", error));
+            case GameStartService.StartResult.BadRequest(Object body) ->
+                    ResponseEntity.badRequest().body(body);
+            case GameStartService.StartResult.Ok(Object body) ->
                     ResponseEntity.ok(body);
         };
     }
@@ -65,7 +85,8 @@ public class SessionController {
         SimpMessagingTemplate messagingTemplate, 
         TurnService turnService, 
         LobbySettingsService lobbySettingsService, 
-        TurnActionPolicy turnActionPolicy) {
+        TurnActionPolicy turnActionPolicy,
+        GameStartService gameStartService) {
 
         this.sessionService = sessionService;
         this.deckService = deckService;
@@ -73,7 +94,9 @@ public class SessionController {
         this.turnService = turnService;
         this.lobbySettingsService = lobbySettingsService;
         this.turnActionPolicy = turnActionPolicy;
+        this.gameStartService = gameStartService;
     }
+
     @PostMapping
     public Map<String, Object> createSession(@RequestBody(required = false) CreateSessionRequest request) {
         GameMode mode = GameMode.from(request == null ? null : request.gameMode());
@@ -97,64 +120,10 @@ public class SessionController {
                 .map(sessionId -> ResponseEntity.ok(Map.of("sessionId", sessionId)))
                 .orElse(ResponseEntity.notFound().build());
     }
-
+    
     @PostMapping("/{sessionId}/deck/init")
     public ResponseEntity<?> initDeck(@PathVariable String sessionId, @RequestParam String playerId) {
-        if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
-    
-        Optional<String> host = sessionService.getHost(sessionId);
-        if (host.isEmpty() || !host.get().equals(playerId)) {
-            return ResponseEntity.status(403).body(Map.of("error", "only the host can start the game"));
-        }
-        if (sessionService.gameStarted(sessionId)) {
-            return ResponseEntity.status(409).body(Map.of("error", "game already started"));
-        }
-    
-        if (!sessionService.canDealStartingHands(sessionId)) {
-            int players = sessionService.getPlayerOrder(sessionId).size();
-            int cardsPerPlayer = sessionService.getCardsPerPlayer(sessionId);
-            int deckCount = sessionService.getDeckCount(sessionId);
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", "not enough cards for starting hands",
-                    "players", players,
-                    "cardsPerPlayer", cardsPerPlayer,
-                    "needed", players * cardsPerPlayer,
-                    "available", deckCount * 52
-            ));
-        }
-        
-        int deckCount = sessionService.getDeckCount(sessionId);
-        int cardsPerPlayer = sessionService.getCardsPerPlayer(sessionId);
-        deckService.initializeDeck(sessionId, deckCount);
-        deckService.dealStartingHands(
-                sessionId,
-                sessionService.getPlayerOrder(sessionId),
-                cardsPerPlayer
-        );
-        
-        GameMode mode = sessionService.getGameMode(sessionId);
-        String currentPlayer = null;
-        
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                new SessionEvent("DECK_INITIALIZED", sessionId, Map.of(
-                        "remaining", deckService.remainingCount(sessionId),
-                        "gameMode", mode.name(),
-                        "cardsPerPlayer", cardsPerPlayer
-                )));
-        
-        if (mode == GameMode.TURN_ROTATION) {
-            turnService.startTurns(sessionId);
-            currentPlayer = turnService.getCurrentPlayer(sessionId).orElse(null);
-            messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                    new SessionEvent("TURN_CHANGED", sessionId, Map.of("playerId", currentPlayer)));
-        }
-        
-        return ResponseEntity.ok(Map.of(
-                "remaining", deckService.remainingCount(sessionId),
-                "currentTurn", currentPlayer,
-                "gameMode", mode.name(),
-                "cardsPerPlayer", cardsPerPlayer
-        ));
+        return toStartResponse(gameStartService.startGame(sessionId, playerId));
     }
 
     @GetMapping("/{sessionId}/hand")
@@ -162,7 +131,6 @@ public class SessionController {
         if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(Map.of("hand", deckService.getHand(sessionId, playerId)));
     }
-
 
     @PostMapping("/{sessionId}/draw")
     public ResponseEntity<?> draw(@PathVariable String sessionId, @RequestBody DrawRequest request) {

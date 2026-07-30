@@ -5,6 +5,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 @Service
@@ -27,6 +28,24 @@ public class LobbySettingsService {
     }
 
     /**
+     * Empty = allowed; present = stop and map to HTTP.
+     * Host-only actions while still in lobby (game not started).
+     */
+    public Optional<UpdateResult> denyUnlessHostInLobby(String sessionId, String playerId) {
+        if (!sessionService.sessionExists(sessionId)) {
+            return Optional.of(new UpdateResult.NotFound());
+        }
+        var host = sessionService.getHost(sessionId);
+        if (host.isEmpty() || !host.get().equals(playerId)) {
+            return Optional.of(new UpdateResult.Forbidden("only the host can do this"));
+        }
+        if (sessionService.gameStarted(sessionId)) {
+            return Optional.of(new UpdateResult.Conflict("game already started"));
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Shared lobby policy: session exists, caller is host, game not started.
      * Caller supplies the actual mutation + broadcast payload.
      */
@@ -38,17 +57,9 @@ public class LobbySettingsService {
             Supplier<Map<String, ?>> eventPayload,
             Supplier<Object> responseBody) {
 
-        if (!sessionService.sessionExists(sessionId)) {
-            return new UpdateResult.NotFound();
-        }
-
-        var host = sessionService.getHost(sessionId);
-        if (host.isEmpty() || !host.get().equals(playerId)) {
-            return new UpdateResult.Forbidden("only the host can change this setting");
-        }
-
-        if (sessionService.gameStarted(sessionId)) {
-            return new UpdateResult.Conflict("game already started");
+        Optional<UpdateResult> denied = denyUnlessHostInLobby(sessionId, playerId);
+        if (denied.isPresent()) {
+            return denied.get();
         }
 
         applyChange.run();
