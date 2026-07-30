@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import com.ava.digitaldeck.services.SessionService;
 import com.ava.digitaldeck.services.DeckService;
 import com.ava.digitaldeck.services.TurnService;
+import com.ava.digitaldeck.services.LobbySettingsService;
 import com.ava.digitaldeck.model.DrawRequest;
 import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.model.CreateSessionRequest;
@@ -34,13 +35,27 @@ public class SessionController {
     private final DeckService deckService;
     private final SimpMessagingTemplate messagingTemplate;
     private final TurnService turnService;
+    private final LobbySettingsService lobbySettingsService;
+    private ResponseEntity<?> toResponse(LobbySettingsService.UpdateResult result) {
+        return switch (result) {
+            case LobbySettingsService.UpdateResult.NotFound() ->
+                    ResponseEntity.notFound().build();
+            case LobbySettingsService.UpdateResult.Forbidden(String error) ->
+                    ResponseEntity.status(403).body(Map.of("error", error));
+            case LobbySettingsService.UpdateResult.Conflict(String error) ->
+                    ResponseEntity.status(409).body(Map.of("error", error));
+            case LobbySettingsService.UpdateResult.Ok(Object body) ->
+                    ResponseEntity.ok(body);
+        };
+    }
 
     @Autowired
-    public SessionController(SessionService sessionService, DeckService deckService, SimpMessagingTemplate messagingTemplate, TurnService turnService) {
+    public SessionController(SessionService sessionService, DeckService deckService, SimpMessagingTemplate messagingTemplate, TurnService turnService, LobbySettingsService lobbySettingsService) {
         this.sessionService = sessionService;
         this.deckService = deckService;
         this.messagingTemplate = messagingTemplate;
         this.turnService = turnService;
+        this.lobbySettingsService = lobbySettingsService;
     }
     @PostMapping
     public Map<String, Object> createSession(@RequestBody(required = false) CreateSessionRequest request) {
@@ -180,36 +195,6 @@ public class SessionController {
         return ResponseEntity.ok(Map.of("hand", deckService.getHand(sessionId, playerId)));
     }
 
-    @PatchMapping("/{sessionId}/game-mode")
-    public ResponseEntity<?> updateGameMode(
-            @PathVariable String sessionId,
-            @RequestBody UpdateGameModeRequest request) {
-
-        if (!sessionService.sessionExists(sessionId)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Optional<String> host = sessionService.getHost(sessionId);
-        if (host.isEmpty() || !host.get().equals(request.playerId())) {
-            return ResponseEntity.status(403)
-                    .body(Map.of("error", "only the host can change game mode"));
-        }
-
-        if (sessionService.gameStarted(sessionId)) {
-            return ResponseEntity.status(409)
-                    .body(Map.of("error", "game already started"));
-        }
-
-        GameMode mode = GameMode.from(request.gameMode());
-        sessionService.setGameMode(sessionId, mode);
-
-        messagingTemplate.convertAndSend(
-                "/topic/session/" + sessionId,
-                new SessionEvent("GAME_MODE_CHANGED", sessionId,
-                        Map.of("gameMode", mode.name())));
-
-        return ResponseEntity.ok(Map.of("gameMode", mode.name()));
-    }
     @PostMapping("/{sessionId}/discard")
     public ResponseEntity<?> discard(@PathVariable String sessionId, @RequestBody DiscardRequest request) {
         if (!sessionService.sessionExists(sessionId)) return ResponseEntity.notFound().build();
@@ -253,96 +238,73 @@ public class SessionController {
                 "topDiscard", discarded.get()
         ));
     }
+
+    @PatchMapping("/{sessionId}/game-mode")
+    public ResponseEntity<?> updateGameMode(
+            @PathVariable String sessionId,
+            @RequestBody UpdateGameModeRequest request) {
+    
+        GameMode mode = GameMode.from(request.gameMode());
+    
+        return toResponse(lobbySettingsService.updateWhileInLobby(
+                sessionId,
+                request.playerId(),
+                () -> sessionService.setGameMode(sessionId, mode),
+                "GAME_MODE_CHANGED",
+                () -> Map.of("gameMode", mode.name()),
+                () -> Map.of("gameMode", mode.name())
+        ));
+    }
+    
     @PatchMapping("/{sessionId}/discard-mode")
     public ResponseEntity<?> updateDiscardMode(
             @PathVariable String sessionId,
             @RequestBody UpdateDiscardModeRequest request) {
-
-        if (!sessionService.sessionExists(sessionId)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Optional<String> host = sessionService.getHost(sessionId);
-        if (host.isEmpty() || !host.get().equals(request.playerId())) {
-            return ResponseEntity.status(403)
-                    .body(Map.of("error", "only the host can change discard mode"));
-        }
-
-        if (sessionService.gameStarted(sessionId)) {
-            return ResponseEntity.status(409)
-                    .body(Map.of("error", "game already started"));
-        }
-
+    
         DiscardMode discardMode = DiscardMode.from(request.discardMode());
-        sessionService.setDiscardMode(sessionId, discardMode);
-
-        messagingTemplate.convertAndSend(
-                "/topic/session/" + sessionId,
-                new SessionEvent("DISCARD_MODE_CHANGED", sessionId,
-                        Map.of("discardMode", discardMode.name())));
-
-        return ResponseEntity.ok(Map.of("discardMode", discardMode.name()));
+    
+        return toResponse(lobbySettingsService.updateWhileInLobby(
+                sessionId,
+                request.playerId(),
+                () -> sessionService.setDiscardMode(sessionId, discardMode),
+                "DISCARD_MODE_CHANGED",
+                () -> Map.of("discardMode", discardMode.name()),
+                () -> Map.of("discardMode", discardMode.name())
+        ));
     }
+    
     @PatchMapping("/{sessionId}/deck-count")
     public ResponseEntity<?> updateDeckCount(
-        @PathVariable String sessionId,
-        @RequestBody UpdateDeckCountRequest request) {
-
-    if (!sessionService.sessionExists(sessionId)) {
-        return ResponseEntity.notFound().build();
+            @PathVariable String sessionId,
+            @RequestBody UpdateDeckCountRequest request) {
+    
+        int deckCount = SessionService.clampDeckCount(request.deckCount());
+    
+        return toResponse(lobbySettingsService.updateWhileInLobby(
+                sessionId,
+                request.playerId(),
+                () -> sessionService.setDeckCount(sessionId, deckCount),
+                "DECK_COUNT_CHANGED",
+                () -> Map.of("deckCount", deckCount),
+                () -> Map.of("deckCount", deckCount)
+        ));
     }
-
-    Optional<String> host = sessionService.getHost(sessionId);
-    if (host.isEmpty() || !host.get().equals(request.playerId())) {
-        return ResponseEntity.status(403)
-                .body(Map.of("error", "only the host can change deck count"));
-    }
-
-    if (sessionService.gameStarted(sessionId)) {
-        return ResponseEntity.status(409)
-                .body(Map.of("error", "game already started"));
-    }
-
-    int deckCount = SessionService.clampDeckCount(request.deckCount());
-    sessionService.setDeckCount(sessionId, deckCount);
-
-    messagingTemplate.convertAndSend(
-            "/topic/session/" + sessionId,
-            new SessionEvent("DECK_COUNT_CHANGED", sessionId,
-                    Map.of("deckCount", deckCount)));
-
-    return ResponseEntity.ok(Map.of("deckCount", deckCount));
-    }
-
+    
     @PatchMapping("/{sessionId}/cards-per-player")
     public ResponseEntity<?> updateCardsPerPlayer(
             @PathVariable String sessionId,
             @RequestBody UpdateCardsPerPlayerRequest request) {
-
-        if (!sessionService.sessionExists(sessionId)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Optional<String> host = sessionService.getHost(sessionId);
-        if (host.isEmpty() || !host.get().equals(request.playerId())) {
-            return ResponseEntity.status(403)
-                    .body(Map.of("error", "only the host can change cards per player"));
-        }
-
-        if (sessionService.gameStarted(sessionId)) {
-            return ResponseEntity.status(409)
-                    .body(Map.of("error", "game already started"));
-        }
-
+    
         int cardsPerPlayer = SessionService.clampCardsPerPlayer(request.cardsPerPlayer());
-        sessionService.setCardsPerPlayer(sessionId, cardsPerPlayer);
-
-        messagingTemplate.convertAndSend(
-                "/topic/session/" + sessionId,
-                new SessionEvent("CARDS_PER_PLAYER_CHANGED", sessionId,
-                        Map.of("cardsPerPlayer", cardsPerPlayer)));
-
-        return ResponseEntity.ok(Map.of("cardsPerPlayer", cardsPerPlayer));
+    
+        return toResponse(lobbySettingsService.updateWhileInLobby(
+                sessionId,
+                request.playerId(),
+                () -> sessionService.setCardsPerPlayer(sessionId, cardsPerPlayer),
+                "CARDS_PER_PLAYER_CHANGED",
+                () -> Map.of("cardsPerPlayer", cardsPerPlayer),
+                () -> Map.of("cardsPerPlayer", cardsPerPlayer)
+        ));
     }
 
 
