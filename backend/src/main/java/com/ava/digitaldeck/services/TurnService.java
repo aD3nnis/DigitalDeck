@@ -68,6 +68,31 @@ public class TurnService {
         return Optional.empty();
     }
 
+    // TurnService additions
+    public void setPendingDrawn(String sessionId, String playerId, String card) {
+        redisTemplate.opsForValue().set(
+            pendingKey(sessionId, playerId), card, SESSION_TTL);
+    }
+
+    public Optional<String> getPendingDrawn(String sessionId, String playerId) {
+        return Optional.ofNullable(
+            redisTemplate.opsForValue().get(pendingKey(sessionId, playerId)));
+    }
+
+    public void clearPendingDrawn(String sessionId, String playerId) {
+        redisTemplate.delete(pendingKey(sessionId, playerId));
+    }
+
+    // /** Clear everyone’s pending when the turn moves. */
+    // public void clearAllPending(String sessionId) {
+
+    //     // delete keys for players in order, or one session-scoped key if you prefer
+    // }
+
+    private String pendingKey(String s, String p) {
+        return "session:" + s + ":pendingDrawn:" + p;
+    }
+
     private String currentKey(String sessionId) { return "session:" + sessionId + ":currentTurnPlayer"; }
     private String orderKey(String sessionId) { return "session:" + sessionId + ":playerOrder"; }
 }

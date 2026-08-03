@@ -57,6 +57,8 @@ export default function Home() {
 
   const sessionSubscriptionRef = useRef<StompSubscription | null>(null);
 
+
+
   useEffect(() => {
     const stompClient = new Client({
       brokerURL: "ws://localhost:8080/ws",
@@ -263,8 +265,8 @@ export default function Home() {
     }
   };
 
-  const drawCard = async () => {
-    if (!sessionId) return;
+  const drawCard = async (): Promise<string | null> => {
+    if (!sessionId) return null;
 
     const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/draw`, {
       method: "POST",
@@ -275,11 +277,30 @@ export default function Home() {
     if (!res.ok) {
       const error = await res.json();
       alert(error.error ?? "Could not draw");
-      return;
+      return null;
     }
 
     const { card } = await res.json();
     setHand((prev) => [...prev, card]);
+    return card as string;  // ← this is the important addition
+  };
+
+  const keepCard = async (): Promise<boolean> => {
+    if (!sessionId) return false;
+    const res = await fetch(
+      `http://localhost:8080/api/sessions/${sessionId}/keep`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId }),
+      }
+    );
+    if (!res.ok) {
+      const error = await res.json();
+      alert(error.error ?? "Could not keep");
+      return false;
+    }
+    return true;
   };
 
   const rehydrateHand = async (resolvedSessionId: string) => {
@@ -518,6 +539,7 @@ export default function Home() {
       onDiscard={discardCards}
       onPlay={playCards}
       statusMessage={statusMessage}
+      onKeep={keepCard}
     />
   );
 

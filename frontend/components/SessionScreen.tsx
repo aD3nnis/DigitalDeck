@@ -14,11 +14,13 @@ type Props = {
   playMode: PlayMode;
   playAreas: Record<string, string[]>;
   topDiscard: string | null;
-  onDraw: () => void;
   onLeave: () => void;
   onDiscard: (cards: string[], source: "HAND" | "PLAY") => Promise<boolean>;
   onPlay: (cards: string[]) => Promise<boolean>;
   statusMessage: string | null;
+  onDraw: () => Promise<string | null>; // return drawn card, or null on fail
+  onKeep: () => Promise<boolean>;
+ 
 };
 
 export default function SessionScreen({
@@ -37,6 +39,7 @@ export default function SessionScreen({
   onDiscard,
   statusMessage,
   onPlay,
+  onKeep,
 }: Props) {
   const canDraw =
     gameMode === "FREE_ROTATION" || currentTurn === playerId;
@@ -47,7 +50,6 @@ export default function SessionScreen({
     playMode === "FREE_PLAY" ||
     (playMode === "TURN_PLAY" && currentTurn === playerId);
 
-  const [selected, setSelected] = useState<number[]>([]);
   const [playSelected, setPlaySelected] = useState<number[]>([]);
 
   const toggle = (i: number) => {
@@ -71,10 +73,63 @@ export default function SessionScreen({
   const selectedPlayCards = () =>
     playSelected.map((i) => (myPlayArea ?? [])[i]);
 
+  const [selected, setSelected] = useState<number[]>([]);
 
+
+  // TURN_DISCARD + TURN_ROTATION + your turn
+  const keepEnabled =
+    gameMode === "TURN_ROTATION" &&
+    discardMode === "TURN_DISCARD" &&
+    currentTurn === playerId;
+
+  const cardStyle = (i: number) => {
+    const isSelected = selected.includes(i);
+    const isPending = pendingIndex === i;
+
+    if (isPending) {
+      return {
+        cursor: "pointer",
+        border: "2px solid #f4c430",
+        background: isSelected ? "#d7ffff" : undefined,
+        fontWeight: isSelected ? "bold" : "normal",
+      } as const;
+    }
+    if (isSelected) {
+      return {
+        cursor: "pointer",
+        border: "2px solid #5ac8fa",
+        background: "#d7ffff",
+        fontWeight: "bold" as const,
+      };
+    }
+    return { cursor: "pointer" as const };
+  };
+
+
+  const [pendingCard, setPendingCard] = useState<string | null>(null);
+
+  const pendingIndex =
+    pendingCard == null ? null : hand.lastIndexOf(pendingCard);
+  
+  const handleDrawDblClick = async () => {
+    const card = await onDraw();
+    if (!card) return;
+    setPendingCard(card);
+    // selection is set by the useEffect below once hand updates
+  };
+  
   useEffect(() => {
-    setSelected([]);
-  }, [hand]);
+    if (pendingCard == null) return;
+    const idx = hand.lastIndexOf(pendingCard);
+    if (idx !== -1) setSelected([idx]);
+  }, [hand, pendingCard]);
+  
+  useEffect(() => {
+    if (currentTurn !== playerId) {
+      setSelected([]);
+      setPendingCard(null);
+    }
+  }, [currentTurn, playerId]);
 
   useEffect(() => {
     setPlaySelected([]);
@@ -99,9 +154,11 @@ export default function SessionScreen({
           {currentTurn === playerId && " (this is you!)"}
         </p>
       )}
-
-      {canDraw && <button onClick={onDraw}>Draw card</button>}
-
+      {canDraw && (
+        <button type="button" onDoubleClick={handleDrawDblClick}>
+          Draw card (double-click)
+        </button>
+      )}
       <p>Cards remaining: {remaining}</p>
 
       {discardMode !== "DISCARD_OFF" && (
@@ -154,19 +211,24 @@ export default function SessionScreen({
             );
           })}
 
-          {discardMode !== "DISCARD_OFF" && (
-            <button
-              type="button"
-              disabled={!canDiscard || playSelected.length === 0}
-              onClick={async () => {
-                const cards = selectedPlayCards();
-                const ok = await onDiscard(cards, "PLAY");
-                if (ok) setPlaySelected([]);
-              }}
-            >
-              Discard from play
-            </button>
-          )}
+      {discardMode !== "DISCARD_OFF" && (
+        <p
+          onDoubleClick={async () => {
+            if (!canDiscard || selected.length === 0) return;
+            const ok = await onDiscard(selectedCards(), "HAND");
+            if (ok) {
+              setSelected([]);
+              setPendingCard(null);
+            }
+          }}
+          style={{ cursor: canDiscard && selected.length > 0 ? "pointer" : undefined }}
+        >
+          Discard pile: {topDiscard ?? "(empty)"}
+          {canDiscard && selected.length > 0
+            ? " — double-click to discard & end turn"
+            : ""}
+        </p>
+      )}
         </section>
       )}
 
@@ -178,16 +240,21 @@ export default function SessionScreen({
 
           return (
             <li
-              key={`${card}-${i}`}
-              onClick={() => toggle(i)}
-              style={{
-                cursor: "pointer",
-                fontWeight: isSelected ? "bold" : "normal",
-                outline: isSelected ? "2px solid currentColor" : undefined,
-              }}
-            >
-              {card}
-              {isSelected && <span> ({order + 1})</span>}
+            key={`${card}-${i}`}
+            onClick={() => toggle(i)}
+            onDoubleClick={async (e) => {
+              e.preventDefault();
+              if (!keepEnabled || pendingIndex !== i) return;
+              const ok = await onKeep();
+              if (ok) {
+                setPendingCard(null);
+                setSelected([]);
+              }
+            }}
+            style={cardStyle(i)}
+          >
+            {card}
+            {isSelected && <span> ({order + 1})</span>}
             </li>
           );
         })}

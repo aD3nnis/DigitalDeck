@@ -25,6 +25,7 @@ import com.ava.digitaldeck.model.UpdateCardsPerPlayerRequest;
 import com.ava.digitaldeck.model.PlayMode;
 import com.ava.digitaldeck.model.PlayRequest;
 import com.ava.digitaldeck.model.UpdatePlayModeRequest;
+import com.ava.digitaldeck.model.KeepRequest;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -160,6 +161,7 @@ public class SessionController {
         }
 
         DeckService.DrawResult result = drawn.get();
+        turnService.setPendingDrawn(sessionId, request.playerId(), result.card());
         String topDiscard = deckService.getTopDiscard(sessionId).orElse(null);
 
         Map<String, Object> payload = new HashMap<>();
@@ -228,9 +230,10 @@ public class SessionController {
         messagingTemplate.convertAndSend(
                 "/topic/session/" + sessionId,
                 new SessionEvent("CARD_DISCARDED", sessionId, payload));
-    
+
+        turnService.clearPendingDrawn(sessionId, request.playerId());
         maybeAdvanceTurn(sessionId, advanceTurn);
-    
+
         return ResponseEntity.ok(Map.of(
                 "cards", discarded,
                 "topDiscard", topDiscard,
@@ -357,6 +360,21 @@ public class SessionController {
                 () -> Map.of("playMode", playMode.name()),
                 () -> Map.of("playMode", playMode.name())
         ));
+    }
+    @PostMapping("/{sessionId}/keep")
+    public ResponseEntity<?> keep(@PathVariable String sessionId,
+                                @RequestBody KeepRequest request) {
+        if (!sessionService.sessionExists(sessionId)) {
+            return ResponseEntity.notFound().build();
+        }
+        TurnActionPolicy.Permit permit =
+            turnActionPolicy.permitKeep(sessionId, request.playerId());
+        if (permit instanceof TurnActionPolicy.Permit.Denied(String error)) {
+            return ResponseEntity.status(403).body(Map.of("error", error));
+        }
+        turnService.clearPendingDrawn(sessionId, request.playerId());
+        maybeAdvanceTurn(sessionId, true);
+        return ResponseEntity.ok(Map.of("ok", true));
     }
 
 

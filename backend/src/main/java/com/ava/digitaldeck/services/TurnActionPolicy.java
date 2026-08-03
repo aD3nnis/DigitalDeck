@@ -70,6 +70,23 @@ public class TurnActionPolicy {
         return new Permit.Allowed(false);
     }
 
+    /** Keep pending draw in hand and end turn. Only when pending exists. */
+    public Permit permitKeep(String sessionId, String playerId) {
+        GameMode mode = sessionService.getGameMode(sessionId);
+        DiscardMode discardMode = sessionService.getDiscardMode(sessionId);
+
+        if (mode != GameMode.TURN_ROTATION || discardMode != DiscardMode.TURN_DISCARD) {
+            return new Permit.Denied("keep is not available in this mode");
+        }
+        if (!isCurrentPlayer(sessionId, playerId)) {
+            return new Permit.Denied("not your turn");
+        }
+        if (turnService.getPendingDrawn(sessionId, playerId).isEmpty()) {
+            return new Permit.Denied("no pending draw to keep");
+        }
+        return new Permit.Allowed(true); // always advances
+    }
+
     private boolean isCurrentPlayer(String sessionId, String playerId) {
         Optional<String> current = turnService.getCurrentPlayer(sessionId);
         return current.isPresent() && current.get().equals(playerId);
