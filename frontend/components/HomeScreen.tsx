@@ -1,6 +1,12 @@
 "use client";
 
 import type { DiscardMode, GameMode, PlayMode } from "./types";
+import {
+  describeDiscardMode,
+  describeGameMode,
+  describePlayMode,
+  describeSetup,
+} from "./setupDescriptions";
 
 type Props = {
   displayName: string;
@@ -64,6 +70,9 @@ export default function HomeScreen({
           />
           Free Rotation
         </label>
+        <p>
+          <small>{describeGameMode(gameMode, discardMode)}</small>
+        </p>
       </section>
 
       <section>
@@ -98,6 +107,9 @@ export default function HomeScreen({
           />
           Free Discard
         </label>
+        <p>
+          <small>{describeDiscardMode(gameMode, discardMode)}</small>
+        </p>
       </section>
       <section>
         <label>
@@ -131,6 +143,18 @@ export default function HomeScreen({
           />
           Free Play
         </label>
+        <p>
+          <small>{describePlayMode(playMode)}</small>
+        </p>
+      </section>
+
+      <section>
+        <p>
+          <small>
+            <strong>How this setup works: </strong>
+            {describeSetup(gameMode, discardMode, playMode)}
+          </small>
+        </p>
       </section>
 
       <section>

@@ -1,6 +1,12 @@
 "use client";
 
 import type { DiscardMode, GameMode, PlayMode } from "./types";
+import {
+  describeDiscardMode,
+  describeGameMode,
+  describePlayMode,
+  describeSetup,
+} from "./setupDescriptions";
 
 type Props = {
   code: string | null;
@@ -79,50 +85,70 @@ export default function LobbyScreen({
             />
             Free Rotation
           </label>
+          <p>
+            <small>{describeGameMode(gameMode, discardMode)}</small>
+          </p>
         </section>
-        
       ) : (
-        <p>
-          Mode:{" "}
-          {gameMode === "TURN_ROTATION" ? "Turn Rotation" : "Free Rotation"}
-        </p>
-        
+        <section>
+          <p>
+            Mode:{" "}
+            {gameMode === "TURN_ROTATION" ? "Turn Rotation" : "Free Rotation"}
+          </p>
+          <p>
+            <small>{describeGameMode(gameMode, discardMode)}</small>
+          </p>
+        </section>
       )}
-      {isHost? (      <section>
-        <label>
-          <input
-            type="radio"
-            name="discardMode"
-            checked={discardMode === "DISCARD_OFF"}
-            onChange={() => onUpdateDiscardMode("DISCARD_OFF")}
-          />
-          Discard Off
-        </label>
-        {gameMode === "TURN_ROTATION" && (
+      {isHost ? (
+        <section>
           <label>
             <input
               type="radio"
               name="discardMode"
-              checked={discardMode === "TURN_DISCARD"}
-              onChange={() => onUpdateDiscardMode("TURN_DISCARD")}
+              checked={discardMode === "DISCARD_OFF"}
+              onChange={() => onUpdateDiscardMode("DISCARD_OFF")}
             />
-            Turn Discard
+            Discard Off
           </label>
-        )}
-        <label>
-          <input
-            type="radio"
-            name="discardMode"
-            checked={discardMode === "FREE_DISCARD"}
-            onChange={() => onUpdateDiscardMode("FREE_DISCARD")}
-          />
-          Free Discard
-        </label>
-      </section>) : (
-        <p>
-          Discard Mode:{" "}
-          {discardMode === "DISCARD_OFF" ? "Discard Off" : discardMode === "TURN_DISCARD" ? "Turn Discard" : "Free Discard"}
-        </p>
+          {gameMode === "TURN_ROTATION" && (
+            <label>
+              <input
+                type="radio"
+                name="discardMode"
+                checked={discardMode === "TURN_DISCARD"}
+                onChange={() => onUpdateDiscardMode("TURN_DISCARD")}
+              />
+              Turn Discard
+            </label>
+          )}
+          <label>
+            <input
+              type="radio"
+              name="discardMode"
+              checked={discardMode === "FREE_DISCARD"}
+              onChange={() => onUpdateDiscardMode("FREE_DISCARD")}
+            />
+            Free Discard
+          </label>
+          <p>
+            <small>{describeDiscardMode(gameMode, discardMode)}</small>
+          </p>
+        </section>
+      ) : (
+        <section>
+          <p>
+            Discard Mode:{" "}
+            {discardMode === "DISCARD_OFF"
+              ? "Discard Off"
+              : discardMode === "TURN_DISCARD"
+                ? "Turn Discard"
+                : "Free Discard"}
+          </p>
+          <p>
+            <small>{describeDiscardMode(gameMode, discardMode)}</small>
+          </p>
+        </section>
       )}
       {isHost ? (
         <section>
@@ -155,17 +181,35 @@ export default function LobbyScreen({
             />
             Free Play
           </label>
+          <p>
+            <small>{describePlayMode(playMode)}</small>
+          </p>
         </section>
       ) : (
-        <p>
-          Play Mode:{" "}
-          {playMode === "PLAY_OFF"
-            ? "Play Off"
-            : playMode === "TURN_PLAY"
-              ? "Turn Play"
-              : "Free Play"}
-        </p>
+        <section>
+          <p>
+            Play Mode:{" "}
+            {playMode === "PLAY_OFF"
+              ? "Play Off"
+              : playMode === "TURN_PLAY"
+                ? "Turn Play"
+                : "Free Play"}
+          </p>
+          <p>
+            <small>{describePlayMode(playMode)}</small>
+          </p>
+        </section>
       )}
+
+      <section>
+        <p>
+          <small>
+            <strong>How this setup works: </strong>
+            {describeSetup(gameMode, discardMode, playMode)}
+          </small>
+        </p>
+      </section>
+
       {isHost ? (
         <section>
           <p>Decks</p>
