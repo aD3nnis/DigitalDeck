@@ -145,11 +145,91 @@ export default function SessionScreen({
 
       <h2>Players</h2>
       <ul>
-        {Object.entries(roster).map(([id, name]) => (
-          <li key={id}>
-            {name} <small>({id})</small>
-          </li>
-        ))}
+      {Object.entries(roster).map(([id, name]) => {
+        const area = playAreas[id] ?? [];
+        const isMine = id === playerId;
+        return (
+          <div key={id}>
+            <h3>
+              {name + "'s play area"}
+              {isMine ? " (you)" : ""}
+            </h3>
+
+            {isMine ? (
+              <div className={styles.yourPlayBoard}>
+                <svg
+                  className={styles.yourPlayBoardSvg}
+                  viewBox="0 0 350.29 100.91"
+                  aria-hidden="true"
+                >
+                  <g
+                    onDoubleClick={async () => {
+                      if (!canPlay || selected.length === 0) return;
+                      const cards = selectedCards();
+                      const ok = await onPlay(cards);
+                      if (ok) setSelected([]);
+                    }}
+                    style={{
+                      cursor:
+                        canPlay && selected.length > 0 ? "pointer" : undefined,
+                    }}
+                  >
+                    <path
+                      className={styles.trapFill}
+                      d="M313.46,5.65c-.13-.51-.58-.86-1.11-.86H38.06c-.52,0-.98.35-1.11.86L14.72,93.86c-.09.34-.01.7.21.98.22.28.55.44.9.44h318.76c.35,0,.68-.16.9-.44.22-.28.29-.64.21-.98l-22.24-88.2Z"
+                    />
+                    <path
+                      className={styles.trapStroke}
+                      d="M338.25,93.21l-22.24-88.2c-.42-1.68-1.93-2.85-3.66-2.85H38.06c-1.73,0-3.24,1.17-3.66,2.85L12.16,93.21c-.29,1.14-.04,2.32.68,3.25.72.93,1.81,1.46,2.98,1.46h318.76c1.17,0,2.26-.53,2.98-1.46.72-.93.97-2.11.68-3.25ZM335.49,94.84c-.22.28-.55.44-.9.44H15.82c-.35,0-.68-.16-.9-.44-.22-.28-.29-.64-.21-.98L36.95,5.65c.13-.51.58-.86,1.11-.86h274.29c.52,0,.98.35,1.11.86l22.24,88.2c.09.34.01.7-.21.98Z"
+                    />
+                  </g>
+                </svg>
+                <div className={styles.yourPlayBoardContent}>
+                  <ul className={styles.playCardUnorderedList}>
+                    {area.length === 0 ? (
+                      <li style={{ listStyle: "none" }}>(empty)</li>
+                    ) : (
+                      area.map((card, i) => {
+                        const order = playSelected.indexOf(i);
+                        const isSelected = order !== -1;
+                        return (
+                          <li
+                            className={styles.playCardList}
+                            key={`${id}-${card}-${i}`}
+                            style={{ listStyle: "none" }}
+                          >
+                            <Card
+                              cardId={card}
+                              selected={isSelected}
+                              order={isSelected ? order + 1 : undefined}
+                              onClick={() => togglePlay(i)}
+                            />
+                          </li>
+                        );
+                      })
+                    )}
+                  </ul>
+                  {canPlay && selected.length > 0
+                    ? " — double-click to play"
+                    : ""}
+                </div>
+              </div>
+            ) : (
+              <ul className={styles.playCardUnorderedList}>
+                {area.length === 0 ? (
+                  <li>(empty)</li>
+                ) : (
+                  area.map((card, i) => (
+                    <li key={`${id}-${card}-${i}`} style={{ listStyle: "none" }}>
+                      <Card cardId={card} />
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
+          </div>
+        );
+      })}
       </ul>
 
       {gameMode === "TURN_ROTATION" && (
@@ -250,7 +330,7 @@ export default function SessionScreen({
       )}
 
       <h2>YOUR HAND</h2>
-      <ul>
+      <ul className={styles.handCardUnorderedList}>
       {hand.map((card, i) => {
         const order = selected.indexOf(i);
         const isSelected = order !== -1;
@@ -278,23 +358,6 @@ export default function SessionScreen({
         );
       })}
       </ul>
-
-      <div>
-
-        {playMode !== "PLAY_OFF" && (
-          <button
-            type="button"
-            disabled={!canPlay || selected.length === 0}
-            onClick={async () => {
-              const cards = selectedCards();
-              const ok = await onPlay(cards);
-              if (ok) setSelected([]);
-            }}
-          >
-            Play
-          </button>
-        )}
-      </div>
 
       <button onClick={onLeave}>Leave session</button>
     </main>
