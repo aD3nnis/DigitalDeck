@@ -1,0 +1,15 @@
+/* SessionScreen.module.css */
+
+.playCardUnorderedList {
+    display: flex;
+    background-color: cornflowerblue;
+    justify-content: center;
+    align-items: center;
+}
+
+.discardPile {
+    display: flex;
+    background-color: rgb(100, 237, 159);
+    justify-content: center;
+    align-items: center;
+}

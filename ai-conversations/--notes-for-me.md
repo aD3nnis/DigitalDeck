@@ -1,3 +1,7 @@
+## TO DO
+add error message for when a player tries to join session without putting a name
+
+
 ##TESTING COMMANDS
 access redis-cli: 
 `docker exec -it digital-deck-redis redis-cli`

@@ -1,0 +1,16 @@
+.card {
+    width: 75px;
+    height: auto;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  
+  .cardButton {
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    list-style: none;
+  }
+  

@@ -2,6 +2,10 @@
 
 import type { DiscardMode, GameMode, PlayMode } from "./types";
 import { useEffect, useState } from "react";
+import { cardSrc, visualState } from "./CardAssets";
+import Card from "./Card";
+import styles from "./SessionScreen.module.css";
+
 
 type Props = {
   roster: Record<string, string>;
@@ -161,47 +165,44 @@ export default function SessionScreen({
       )}
       <p>Cards remaining: {remaining}</p>
 
-      {discardMode !== "DISCARD_OFF" && (
-        <p>Discard pile: {topDiscard ?? "(empty)"}</p>
-      )}
       {statusMessage && <p>{statusMessage}</p>}
 
       {playMode !== "PLAY_OFF" && (
         <section>
-          <h2>Play areas</h2>
+          <h2>PLAY AREAS</h2>
           {Object.entries(roster).map(([id, name]) => {
             const area = playAreas[id] ?? [];
             const isMine = id === playerId;
             return (
               <div key={id}>
                 <h3>
-                  {name}
+                  {name + "'s play area"}
                   {isMine ? " (you)" : ""}
                 </h3>
-                <ul>
+                <ul className={styles.playCardUnorderedList}>
                   {area.length === 0 ? (
                     <li>(empty)</li>
                   ) : (
                     area.map((card, i) => {
                       if (!isMine) {
-                        return <li key={`${id}-${card}-${i}`}>{card}</li>;
+                        return (
+                          <li key={`${id}-${card}-${i}`} style={{ listStyle: "none" }}>
+                            <Card cardId={card} />
+                          </li>
+                        );
                       }
+                    
                       const order = playSelected.indexOf(i);
                       const isSelected = order !== -1;
+                    
                       return (
-                        <li
-                          key={`${id}-${card}-${i}`}
-                          onClick={() => togglePlay(i)}
-                          style={{
-                            cursor: "pointer",
-                            fontWeight: isSelected ? "bold" : "normal",
-                            outline: isSelected
-                              ? "2px solid currentColor"
-                              : undefined,
-                          }}
-                        >
-                          {card}
-                          {isSelected && <span> ({order + 1})</span>}
+                        <li className={styles.playCardList} key={`${id}-${card}-${i}`} style={{ listStyle: "none" }}>
+                          <Card
+                            cardId={card}
+                            selected={isSelected}
+                            order={isSelected ? order + 1 : undefined}
+                            onClick={() => togglePlay(i)}
+                          />
                         </li>
                       );
                     })
@@ -212,34 +213,52 @@ export default function SessionScreen({
           })}
 
       {discardMode !== "DISCARD_OFF" && (
-        <p
+        <div
+          className={styles.discardPile}
           onDoubleClick={async () => {
-            if (!canDiscard || selected.length === 0) return;
+            if (!canDiscard) return;
+            // Prefer play-area selection when both are set
+            if (playSelected.length > 0) {
+              const ok = await onDiscard(selectedPlayCards(), "PLAY");
+              if (ok) setPlaySelected([]);
+              return;
+            }
+            if (selected.length === 0) return;
             const ok = await onDiscard(selectedCards(), "HAND");
             if (ok) {
               setSelected([]);
               setPendingCard(null);
             }
           }}
-          style={{ cursor: canDiscard && selected.length > 0 ? "pointer" : undefined }}
+          style={{
+            cursor:
+              canDiscard && (selected.length > 0 || playSelected.length > 0)
+                ? "pointer"
+                : undefined,
+          }}
         >
-          Discard pile: {topDiscard ?? "(empty)"}
-          {canDiscard && selected.length > 0
+          <div>
+            <p>DISCARD PILE:</p>
+            {topDiscard && <Card cardId={topDiscard} />}
+          </div>
+          {canDiscard && (selected.length > 0 || playSelected.length > 0)
             ? " — double-click to discard & end turn"
             : ""}
-        </p>
+        </div>
       )}
         </section>
       )}
 
-      <h2>Your hand</h2>
+      <h2>YOUR HAND</h2>
       <ul>
-        {hand.map((card, i) => {
-          const order = selected.indexOf(i);
-          const isSelected = order !== -1;
+      {hand.map((card, i) => {
+        const order = selected.indexOf(i);
+        const isSelected = order !== -1;
+        const isPending = pendingIndex === i;
+        const src = cardSrc(card, visualState({ selected: isSelected, pending: isPending }));
 
-          return (
-            <li
+        return (
+          <li
             key={`${card}-${i}`}
             onClick={() => toggle(i)}
             onDoubleClick={async (e) => {
@@ -251,29 +270,16 @@ export default function SessionScreen({
                 setSelected([]);
               }
             }}
-            style={cardStyle(i)}
+            style={{ cursor: "pointer", listStyle: "none" }}
           >
-            {card}
+            <img src={src} alt={card} width={80} /* or CSS class */ />
             {isSelected && <span> ({order + 1})</span>}
-            </li>
-          );
-        })}
+          </li>
+        );
+      })}
       </ul>
 
       <div>
-        {discardMode !== "DISCARD_OFF" && (
-          <button
-            type="button"
-            disabled={!canDiscard || selected.length === 0}
-            onClick={async () => {
-              const cards = selectedCards();
-              const ok = await onDiscard(cards, "HAND");
-              if (ok) setSelected([]);
-            }}
-          >
-            Discard
-          </button>
-        )}
 
         {playMode !== "PLAY_OFF" && (
           <button
