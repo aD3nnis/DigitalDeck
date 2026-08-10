@@ -54,6 +54,17 @@ export default function SessionScreen({
     playMode === "FREE_PLAY" ||
     (playMode === "TURN_PLAY" && currentTurn === playerId);
 
+  const HAND_WIDTH = 350;
+  const CARD_WIDTH = 80;
+  const FAN_STEP = 15; // px between card origins
+  const FAN_DEG = 3;
+  const FAN_STEP_Y = 2;
+    
+  /** Centered fan: [-3,0], [-3,0,3], [-6,-3,0,3], … */
+  function fanAngle(index: number, count: number): number {
+    return (-Math.floor(count / 2) + index) * FAN_DEG;
+  }
+
   const [playSelected, setPlaySelected] = useState<number[]>([]);
 
   const toggle = (i: number) => {
@@ -118,6 +129,15 @@ export default function SessionScreen({
 
   const pendingIndex =
     pendingCard == null ? null : hand.lastIndexOf(pendingCard);
+
+
+    const seats = Object.entries(roster); 
+    const myIndex = seats.findIndex(([id]) => id === playerId);
+    
+    const orderedSeats =
+    myIndex === -1
+      ? seats
+      : [...seats.slice(myIndex + 1), ...seats.slice(0, myIndex + 1)];
   
   
   useEffect(() => {
@@ -142,8 +162,8 @@ export default function SessionScreen({
       <h1>Game</h1>
 
       <h2>Players</h2>
-      <ul>
-      {Object.entries(roster).map(([id, name]) => {
+      <ul className={styles.playAreaUnorderedList}>
+      {orderedSeats.map(([id, name]) => {
         const area = playAreas[id] ?? [];
         const isMine = id === playerId;
         return (
@@ -209,19 +229,37 @@ export default function SessionScreen({
                   </ul>
                 </div>
               </div>
-            ) : (
-              <ul className={styles.playCardUnorderedList}>
-                {area.length === 0 ? (
-                  <li>(empty)</li>
-                ) : (
-                  area.map((card, i) => (
-                    <li key={`${id}-${card}-${i}`} style={{ listStyle: "none" }}>
-                      <Card cardId={card} />
-                    </li>
-                  ))
-                )}
-              </ul>
-            )}
+              ) : (
+                <div className={styles.player2BoardTwoPlayerGame}>
+                  <svg
+                    className={styles.yourPlayBoardSvg}
+                    viewBox="0 0 350 47.4"
+                    aria-hidden="true"
+                  >
+                    <path
+                      className={styles.trapFill}
+                      d="M88.88,42.69c.07.15.36.66,1.03.66h170.27c.68,0,.96-.5,1.04-.66.07-.15.27-.7-.16-1.22l-30.87-36.78c-.22-.26-.54-.41-.87-.41h-108.66c-.34,0-.66.15-.88.41l-30.74,36.78c-.43.52-.23,1.06-.16,1.22Z"
+                    />
+                    <path
+                      className={styles.trapStroke}
+                      d="M89.91,45.98h170.27c1.48,0,2.8-.84,3.42-2.18.63-1.35.42-2.89-.53-4.03L232.21,2.99c-.72-.86-1.77-1.35-2.89-1.35h-108.66c-1.12,0-2.18.49-2.9,1.36l-30.74,36.78c-.95,1.14-1.15,2.68-.52,4.02.63,1.34,1.94,2.18,3.42,2.18ZM120.65,4.28h108.66c.34,0,.66.15.87.41l30.87,36.78c.43.52.23,1.06.16,1.22-.07.15-.36.66-1.04.66H89.91c-.67,0-.96-.5-1.03-.66-.07-.15-.27-.7.16-1.22L119.78,4.69c.22-.26.54-.41.88-.41Z"
+                    />
+                  </svg>
+                  <div className={styles.yourPlayBoardContent}>
+                    <ul className={styles.playCardUnorderedList}>
+                      {area.length === 0 ? (
+                        <li style={{ listStyle: "none" }}></li>
+                      ) : (
+                        area.map((card, i) => (
+                          <li key={`${id}-${card}-${i}`} style={{ listStyle: "none" }}>
+                            <Card cardId={card} />
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              )}
           </div>
         );
       })}
@@ -314,34 +352,52 @@ export default function SessionScreen({
       )}
       </section>
 
-      <h2>YOUR HAND</h2>
-      <ul className={styles.handCardUnorderedList}>
-      {hand.map((card, i) => {
-        const order = selected.indexOf(i);
-        const isSelected = order !== -1;
-        const isPending = pendingIndex === i;
-        const src = cardSrc(card, visualState({ selected: isSelected, pending: isPending }));
+      <ul className={styles.playAreaUnorderedList}>
+        <div className={styles.handCardUnorderedList}>
+        {hand.map((card, i) => {
+          const order = selected.indexOf(i);
+          const isSelected = order !== -1;
+          const isPending = pendingIndex === i;
+          const src = cardSrc(
+            card,
+            visualState({ selected: isSelected, pending: isPending }),
+          );
 
-        return (
-          <li
-            key={`${card}-${i}`}
-            onClick={() => toggle(i)}
-            onDoubleClick={async (e) => {
-              e.preventDefault();
-              if (!keepEnabled || pendingIndex !== i) return;
-              const ok = await onKeep();
-              if (ok) {
-                setPendingCard(null);
-                setSelected([]);
-              }
-            }}
-            style={{ cursor: "pointer", listStyle: "none" }}
-          >
-            <img src={src} alt={card} width={80} /* or CSS class */ />
-            {isSelected && <span> ({order + 1})</span>}
-          </li>
-        );
-      })}
+          const n = hand.length;
+          const fanWidth = CARD_WIDTH + Math.max(0, n - 1) * FAN_STEP;
+          const originX = (HAND_WIDTH - fanWidth) / 2;
+          const angle = fanAngle(i, n);
+
+          const center = (n - 1) / 2;
+          const drop = Math.abs(i - center) * FAN_STEP_Y; 
+
+          return (
+            <li
+              key={`${card}-${i}`}
+              className={styles.handCard}
+              onClick={() => toggle(i)}
+              onDoubleClick={async (e) => {
+                e.preventDefault();
+                if (!keepEnabled || pendingIndex !== i) return;
+                const ok = await onKeep();
+                if (ok) {
+                  setPendingCard(null);
+                  setSelected([]);
+                }
+              }}
+              style={{
+                left: originX + i * FAN_STEP,
+                bottom: 8 - drop,
+                transform: `rotate(${angle}deg)`,
+                zIndex: i,
+              }}
+            >
+              <img src={src} alt={card} width={CARD_WIDTH} />
+              {isSelected && <span> ({order + 1})</span>}
+            </li>
+          );
+        })}
+        </div>
       </ul>
 
       <button onClick={onLeave}>Leave session</button>
