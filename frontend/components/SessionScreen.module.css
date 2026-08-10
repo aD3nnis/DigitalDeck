@@ -2,7 +2,6 @@
 
 .playCardUnorderedList {
     display: flex;
-    background-color: cornflowerblue;
     justify-content: center;
     align-items: center;
 }
