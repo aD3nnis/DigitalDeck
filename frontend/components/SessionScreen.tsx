@@ -79,8 +79,12 @@ export default function SessionScreen({
 
   const [selected, setSelected] = useState<number[]>([]);
 
+  const handleDrawDblClick = async () => {
+    const card = await onDraw();
+    if (!card) return;
+    setPendingCard(card);
+  };
 
-  // TURN_DISCARD + TURN_ROTATION + your turn
   const keepEnabled =
     gameMode === "TURN_ROTATION" &&
     discardMode === "TURN_DISCARD" &&
@@ -115,12 +119,6 @@ export default function SessionScreen({
   const pendingIndex =
     pendingCard == null ? null : hand.lastIndexOf(pendingCard);
   
-  const handleDrawDblClick = async () => {
-    const card = await onDraw();
-    if (!card) return;
-    setPendingCard(card);
-    // selection is set by the useEffect below once hand updates
-  };
   
   useEffect(() => {
     if (pendingCard == null) return;
@@ -209,9 +207,6 @@ export default function SessionScreen({
                       })
                     )}
                   </ul>
-                  {canPlay && selected.length > 0
-                    ? " — double-click to play"
-                    : ""}
                 </div>
               </div>
             ) : (
@@ -238,96 +233,86 @@ export default function SessionScreen({
           {currentTurn === playerId && " (this is you!)"}
         </p>
       )}
-      {canDraw && (
-        <button type="button" onDoubleClick={handleDrawDblClick}>
-          Draw card (double-click)
-        </button>
-      )}
-      <p>Cards remaining: {remaining}</p>
 
-      {statusMessage && <p>{statusMessage}</p>}
+      {/* DRAW SECTION:  */}
+      <section style={{ display: "flex", justifyContent: "center" }}>
+      <div className={styles.drawBoard}>
+        <svg
+          className={styles.yourPlayBoardSvg}
+          viewBox="0 0 50 77.55"
+          aria-hidden="true"
+        >
+          <g
+            onDoubleClick={handleDrawDblClick}
+            style={{
+              cursor: canDraw ? "pointer" : undefined,
+            }}
+          >
+            <path
+              className={styles.trapFill}
+              d="M5.53,73.14c.23.35.64.55,1.09.55h36.63c.7,0,1.27-.51,1.27-1.14v-36.53c0-.63-.57-1.14-1.27-1.14h-22.09c-.54,0-1.02.31-1.2.76l-14.54,36.53c-.18.44,0,.8.11.97Z"
+            />
+            <path
+              className={styles.trapStroke}
+              d="M6.62,76.33h36.63c2.16,0,3.91-1.69,3.91-3.78v-36.53c0-2.08-1.75-3.78-3.91-3.78h-22.09c-1.61,0-3.07.97-3.65,2.42L2.97,71.19c-.46,1.15-.32,2.4.38,3.43.73,1.07,1.95,1.71,3.27,1.71ZM21.16,34.88h22.09c.7,0,1.27.51,1.27,1.14v36.53c0,.63-.57,1.14-1.27,1.14H6.62c-.45,0-.86-.21-1.09-.55-.12-.17-.29-.53-.11-.97l14.54-36.53c.18-.45.66-.76,1.2-.76Z"
+            />
+          </g>
+        </svg>
+      </div>
 
       {playMode !== "PLAY_OFF" && (
-        <section>
-          <h2>PLAY AREAS</h2>
-          {Object.entries(roster).map(([id, name]) => {
-            const area = playAreas[id] ?? [];
-            const isMine = id === playerId;
-            return (
-              <div key={id}>
-                <h3>
-                  {name + "'s play area"}
-                  {isMine ? " (you)" : ""}
-                </h3>
-                <ul className={styles.playCardUnorderedList}>
-                  {area.length === 0 ? (
-                    <li>(empty)</li>
-                  ) : (
-                    area.map((card, i) => {
-                      if (!isMine) {
-                        return (
-                          <li key={`${id}-${card}-${i}`} style={{ listStyle: "none" }}>
-                            <Card cardId={card} />
-                          </li>
-                        );
-                      }
-                    
-                      const order = playSelected.indexOf(i);
-                      const isSelected = order !== -1;
-                    
-                      return (
-                        <li className={styles.playCardList} key={`${id}-${card}-${i}`} style={{ listStyle: "none" }}>
-                          <Card
-                            cardId={card}
-                            selected={isSelected}
-                            order={isSelected ? order + 1 : undefined}
-                            onClick={() => togglePlay(i)}
-                          />
-                        </li>
-                      );
-                    })
-                  )}
-                </ul>
-              </div>
-            );
-          })}
+        <>
 
-      {discardMode !== "DISCARD_OFF" && (
-        <div
-          className={styles.discardPile}
-          onDoubleClick={async () => {
-            if (!canDiscard) return;
-            // Prefer play-area selection when both are set
-            if (playSelected.length > 0) {
-              const ok = await onDiscard(selectedPlayCards(), "PLAY");
-              if (ok) setPlaySelected([]);
-              return;
-            }
-            if (selected.length === 0) return;
-            const ok = await onDiscard(selectedCards(), "HAND");
-            if (ok) {
-              setSelected([]);
-              setPendingCard(null);
-            }
-          }}
-          style={{
-            cursor:
-              canDiscard && (selected.length > 0 || playSelected.length > 0)
-                ? "pointer"
-                : undefined,
-          }}
-        >
-          <div>
-            <p>DISCARD PILE:</p>
-            {topDiscard && <Card cardId={topDiscard} />}
+        {discardMode !== "DISCARD_OFF" && (
+          <div className={styles.discardBoard}>
+            <svg
+              className={styles.yourPlayBoardSvg}
+              viewBox="0 0 50 77.55"
+              aria-hidden="true"
+            >
+              <g
+                onDoubleClick={async () => {
+                  if (!canDiscard) return;
+                  if (playSelected.length > 0) {
+                    const ok = await onDiscard(selectedPlayCards(), "PLAY");
+                    if (ok) setPlaySelected([]);
+                    return;
+                  }
+                  if (selected.length === 0) return;
+                  const ok = await onDiscard(selectedCards(), "HAND");
+                  if (ok) {
+                    setSelected([]);
+                    setPendingCard(null);
+                  }
+                }}
+                style={{
+                  cursor:
+                    canDiscard && (selected.length > 0 || playSelected.length > 0)
+                      ? "pointer"
+                      : undefined,
+                }}
+              >
+                <path
+                  className={styles.trapFill}
+                  d="M7.04,73.69h36.63c.45,0,.86-.21,1.09-.55.12-.17.29-.53.11-.97l-14.54-36.53c-.18-.45-.66-.76-1.2-.76H7.04c-.7,0-1.27.51-1.27,1.14v36.53c0,.63.57,1.14,1.27,1.14Z"
+                />
+                <path
+                  className={styles.trapStroke}
+                  d="M43.68,76.33c1.32,0,2.55-.64,3.27-1.71.7-1.03.84-2.28.38-3.43l-14.54-36.53c-.58-1.45-2.04-2.42-3.65-2.42H7.04c-2.16,0-3.91,1.69-3.91,3.78v36.53c0,2.08,1.75,3.78,3.91,3.78h36.63ZM5.77,36.02c0-.63.57-1.14,1.27-1.14h22.09c.54,0,1.02.31,1.2.76l14.54,36.53c.18.44,0,.8-.11.97-.23.35-.64.55-1.09.55H7.04c-.7,0-1.27-.51-1.27-1.14v-36.53Z"
+                />
+              </g>
+            </svg>
+            <div className={styles.yourPlayBoardContent}>
+              {topDiscard && <Card cardId={topDiscard} />}
+              {canDiscard && (selected.length > 0 || playSelected.length > 0)
+                ? " — double-click to discard & end turn"
+                : ""}
+            </div>
           </div>
-          {canDiscard && (selected.length > 0 || playSelected.length > 0)
-            ? " — double-click to discard & end turn"
-            : ""}
-        </div>
+        )}
+        </>
       )}
-        </section>
-      )}
+      </section>
 
       <h2>YOUR HAND</h2>
       <ul className={styles.handCardUnorderedList}>
@@ -360,6 +345,10 @@ export default function SessionScreen({
       </ul>
 
       <button onClick={onLeave}>Leave session</button>
+
+      <p>Cards remaining: {remaining}</p>
+
+      {statusMessage && <p>{statusMessage}</p>}
     </main>
   );
 }

@@ -44,6 +44,20 @@
     pointer-events: none;
   }
 
+  .player2BoardTwoPlayerGame {
+    position: relative;
+    width: 350px;
+    aspect-ratio: 350.29 / 100.91;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0.5rem 1.5rem;
+    box-sizing: border-box;
+    /* Rectangular box itself is not clickable — only the SVG trapezoid is. */
+    pointer-events: none;
+  }
+
   .trapFill {
     fill: #405f52;
     pointer-events: fill;
@@ -75,4 +89,30 @@
     margin: 0;
     padding: 0;
     width: 100%;
+  }
+
+  .discardBoard {
+    position: relative;
+    width: 50px; /* or scale up, e.g. 100px */
+    aspect-ratio: 50 / 77.55;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0.5rem;
+    box-sizing: border-box;
+    pointer-events: none;
+  }
+
+  .drawBoard {
+    position: relative;
+    width: 50px; /* or scale up, e.g. 100px */
+    aspect-ratio: 50 / 77.55;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0.5rem;
+    box-sizing: border-box;
+    pointer-events: none;
   }

@@ -327,3 +327,22 @@ In `frontend/public/board-parts/your-play-board.svg` you already had:
 When we inlined it, those same `viewBox` + `d` values went into `SessionScreen.tsx`. Same geometry, just embedded in the component instead of loaded as a background image.
 
 So if the hit area looks right, it’s because it’s literally your paths. If you re-export from Illustrator later, swap the new `viewBox` and `d` values in (and update `aspect-ratio` if the viewBox size changes).
+
+---
+## me
+if i wanted to tranform my svg by rotating it 3 degrees in css, would that mess up the clicable area or would the clicable area follow the transform?
+
+--- 
+## Cursor
+The clickable area **follows the transform**.
+
+A CSS `transform: rotate(3deg)` on the SVG (or on a wrapper that includes it) rotates both the paint and the hit-testing geometry. Your trapezoid paths with `pointer-events: fill` stay aligned with what you see.
+
+One catch: rotate the **same element** (or parent) that you intend to click. If you rotate only the SVG and leave the card overlay unrotated, the board hit area tilts but the cards stay axis-aligned — usually rotate the whole `.yourPlayBoard` so board + content move together:
+
+```css
+.yourPlayBoard {
+  transform: rotate(3deg);
+  transform-origin: center center; /* adjust if needed */
+}
+```
