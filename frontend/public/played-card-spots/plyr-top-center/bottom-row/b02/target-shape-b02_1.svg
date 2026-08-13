@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21.78 16.52">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #231f20;
+      }
+
+      .cls-2 {
+        fill: #ffc1a8;
+      }
+    </style>
+  </defs>
+  <g id="what_cards_need_duplicated" data-name="what cards need duplicated">
+    <g>
+      <path class="cls-2" d="M13.4.26H.66c-.17,0-.28.1-.25.22l4.35,15.31c.05.18.26.32.48.32h15.77c.21,0,.32-.14.23-.32L13.81.48c-.06-.12-.24-.21-.41-.21Z"/>
+      <path class="cls-1" d="M13.27,0H.58C.19,0-.06.22.01.48l4.26,15.31c.11.4.6.73,1.08.73h15.84c.48,0,.71-.33.52-.73L14.21.48C14.08.21,13.66,0,13.27,0ZM21.23,15.79c.09.18-.02.32-.23.32H5.23c-.21,0-.43-.14-.48-.32L.41.48c-.03-.12.08-.21.25-.21h12.74c.17,0,.36.09.41.2l7.41,15.32Z"/>
+    </g>
+  </g>
+</svg>

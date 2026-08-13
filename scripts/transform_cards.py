@@ -225,15 +225,34 @@ def endpoint_samples(d: str) -> List[Point]:
     return pts
 
 
+def order_quad_tl_tr_br_bl(corners: Sequence[Point]) -> List[Point]:
+    """
+    Reorder 4 silhouette corners to geometric TL → TR → BR → BL.
+
+    Right-side board spots are often drawn starting at the top-right, so path
+    order alone would mirror the artwork. Sorting by position keeps cards
+    upright regardless of Illustrator draw direction.
+    """
+    if len(corners) != 4:
+        raise ValueError(f"Need 4 corners, got {len(corners)}")
+    by_y = sorted(corners, key=lambda p: (p[1], p[0]))
+    top = sorted(by_y[:2], key=lambda p: p[0])
+    bottom = sorted(by_y[2:], key=lambda p: p[0])
+    return [top[0], top[1], bottom[1], bottom[0]]
+
+
 def corners_from_path(d: str) -> List[Point]:
     """
     Find TL → TR → BR → BL for a card silhouette.
 
     Illustrator card outlines are typically:
-      M (TL) → long side (TR) → corner curve → long side (BR) → …
+      M (corner) → long side → corner curve → long side → …
     so the four corners are the start point plus the ends of the three long
     straight sides. Short corner curves are skipped. Uses only the first
     subpath so compound border rings don't pollute the result.
+
+    Corners are then sorted geometrically (TL TR BR BL) so mirrored path
+    drawing order on right-side seats does not flip the card art.
     """
     ring = first_subpath_d(d)
     cmds = parse_path(ring)
@@ -325,7 +344,7 @@ def corners_from_path(d: str) -> List[Point]:
             )
             used.add(best_i)
             corners.append(pts[best_i])
-    return corners[:4]
+    return order_quad_tl_tr_br_bl(corners[:4])
 
 
 def transform_path(d: str, H: List[List[float]]) -> str:
@@ -779,6 +798,156 @@ def insert_after_defs_or_open(svg: str, markup: str) -> str:
     return svg[:i] + "\n  " + markup + svg[i:]
 
 
+def rotate_point_cw(x: float, y: float, cx: float, cy: float, degrees: int) -> Point:
+    """Rotate (x, y) around (cx, cy) by degrees clockwise (SVG/CSS convention)."""
+    d = degrees % 360
+    dx, dy = x - cx, y - cy
+    if d == 0:
+        return x, y
+    if d == 90:
+        return cx - dy, cy + dx
+    if d == 180:
+        return cx - dx, cy - dy
+    if d == 270:
+        return cx + dy, cy - dx
+    rad = math.radians(d)
+    cos_a, sin_a = math.cos(rad), math.sin(rad)
+    # Clockwise in y-down coords
+    return cx + dx * cos_a + dy * sin_a, cy - dx * sin_a + dy * cos_a
+
+
+def rotate_path(d: str, cx: float, cy: float, degrees: int) -> str:
+    """Rotate every coordinate in a path; emit absolute commands."""
+    out: List[str] = []
+    curx = cury = 0.0
+    for cmd, v in parse_path(d):
+        C = cmd.upper()
+        rel = cmd.islower()
+        if C == "Z":
+            out.append("Z")
+            continue
+        if C in ("M", "L", "T"):
+            x, y = v
+            if rel:
+                x += curx
+                y += cury
+            X, Y = rotate_point_cw(x, y, cx, cy, degrees)
+            out.append(f"{C}{fmt_pair((X, Y))}")
+            curx, cury = x, y
+        elif C == "H":
+            x = v[0] + (curx if rel else 0.0)
+            X, Y = rotate_point_cw(x, cury, cx, cy, degrees)
+            out.append(f"L{fmt_pair((X, Y))}")
+            curx = x
+        elif C == "V":
+            y = v[0] + (cury if rel else 0.0)
+            X, Y = rotate_point_cw(curx, y, cx, cy, degrees)
+            out.append(f"L{fmt_pair((X, Y))}")
+            cury = y
+        elif C in ("C", "S", "Q"):
+            pts_abs: List[Point] = []
+            for j in range(0, len(v), 2):
+                x, y = v[j], v[j + 1]
+                if rel:
+                    x += curx
+                    y += cury
+                pts_abs.append((x, y))
+            tpts = [rotate_point_cw(x, y, cx, cy, degrees) for x, y in pts_abs]
+            out.append(C + " ".join(fmt_pair(p) for p in tpts))
+            curx, cury = pts_abs[-1]
+        elif C == "A":
+            x, y = v[5], v[6]
+            if rel:
+                x += curx
+                y += cury
+            X, Y = rotate_point_cw(x, y, cx, cy, degrees)
+            out.append(f"L{fmt_pair((X, Y))}")
+            curx, cury = x, y
+        else:
+            raise ValueError(f"Unsupported path command: {cmd}")
+    return "".join(out)
+
+
+def rotate_svg(svg: str, degrees: int) -> str:
+    """
+    Rotate all geometry clockwise around the viewBox center and update viewBox.
+    Intended for 90 / 180 / 270 (side-seat landscape cards).
+    """
+    degrees = int(degrees) % 360
+    if degrees == 0:
+        return svg
+    if degrees not in (90, 180, 270):
+        raise ValueError("--rotate only supports 0, 90, 180, or 270")
+
+    vx, vy, vw, vh = parse_viewbox(svg)
+    cx, cy = vx + vw / 2.0, vy + vh / 2.0
+
+    # Rotated AABB of the original viewBox
+    vb_corners = [
+        (vx, vy),
+        (vx + vw, vy),
+        (vx + vw, vy + vh),
+        (vx, vy + vh),
+    ]
+    rot_vb = [rotate_point_cw(x, y, cx, cy, degrees) for x, y in vb_corners]
+    xs = [p[0] for p in rot_vb]
+    ys = [p[1] for p in rot_vb]
+    new_vb = (min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys))
+
+    def path_repl(m: re.Match) -> str:
+        attrs = parse_attrs(m.group(1))
+        d = attrs.get("d")
+        if not d:
+            return m.group(0)
+        attrs["d"] = rotate_path(d, cx, cy, degrees)
+        return f"<path{attrs_to_str(attrs)}/>"
+
+    def poly_repl(tag: str):
+        def repl(m: re.Match) -> str:
+            attrs = parse_attrs(m.group(1))
+            pts = attrs.get("points")
+            if not pts:
+                return m.group(0)
+            nums = parse_points_attr(pts)
+            rot = [rotate_point_cw(x, y, cx, cy, degrees) for x, y in nums]
+            attrs["points"] = " ".join(fmt_pair(p) for p in rot)
+            return f"<{tag}{attrs_to_str(attrs)}/>"
+
+        return repl
+
+    def rect_repl(m: re.Match) -> str:
+        attrs = parse_attrs(m.group(1))
+        try:
+            x = float(attrs.get("x", "0"))
+            y = float(attrs.get("y", "0"))
+            w = float(attrs["width"])
+            h = float(attrs["height"])
+        except (KeyError, ValueError):
+            return m.group(0)
+        corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+        rot = [rotate_point_cw(px, py, cx, cy, degrees) for px, py in corners]
+        rxs = [p[0] for p in rot]
+        rys = [p[1] for p in rot]
+        attrs["x"] = fmt(min(rxs))
+        attrs["y"] = fmt(min(rys))
+        attrs["width"] = fmt(max(rxs) - min(rxs))
+        attrs["height"] = fmt(max(rys) - min(rys))
+        if degrees % 180 == 90:
+            rx = attrs.get("rx")
+            ry = attrs.get("ry")
+            if rx is not None or ry is not None:
+                attrs["rx"] = ry if ry is not None else rx
+                attrs["ry"] = rx if rx is not None else ry
+        return f"<rect{attrs_to_str(attrs)}/>"
+
+    out = PATH_TAG_RE.sub(path_repl, svg)
+    out = POLYGON_TAG_RE.sub(poly_repl("polygon"), out)
+    out = POLYLINE_TAG_RE.sub(poly_repl("polyline"), out)
+    out = RECT_TAG_RE.sub(rect_repl, out)
+    out = set_viewbox(out, new_vb)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Core transform
 # ---------------------------------------------------------------------------
@@ -795,12 +964,16 @@ def transform_card_svg(
     src_corners: Optional[Sequence[Point]] = None,
     dst_corners: Optional[Sequence[Point]] = None,
     keep_group: Optional[str] = None,
+    rotate: int = 0,
 ) -> str:
     target_paths = extract_paths(target_svg)
     outer_d, inner_d = pick_frame_paths(target_paths, outer_index, inner_index)
 
     if keep_group:
         source_svg = keep_only_group(source_svg, keep_group)
+
+    if rotate:
+        source_svg = rotate_svg(source_svg, rotate)
 
     src_vb = parse_viewbox(source_svg)
     tgt_vb = parse_viewbox(target_svg)
@@ -963,6 +1136,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         help='Keep only this <g id="..."> (default/drawn-last). '
              "Inferred from filename when omitted.",
     )
+    p.add_argument(
+        "--rotate",
+        type=int,
+        default=0,
+        choices=(0, 90, 180, 270),
+        help="Rotate source card clockwise before warping (SVG/CSS degrees). "
+             "Use 270 for side-seat landscape silhouettes.",
+    )
     p.add_argument("--dry-run", action="store_true",
                    help="List files that would be written without writing")
     args = p.parse_args(argv)
@@ -986,7 +1167,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for src in inputs:
         dest = output_path_for(src, input_root, args.output, input_is_file)
         keep_group = args.keep_group or infer_keep_group(src)
-        print(f"{src}  →  {dest}" + (f"  [keep {keep_group}]" if keep_group else ""))
+        extras = []
+        if keep_group:
+            extras.append(f"keep {keep_group}")
+        if args.rotate:
+            extras.append(f"rotate {args.rotate}")
+        print(f"{src}  →  {dest}" + (f"  [{', '.join(extras)}]" if extras else ""))
         if args.dry_run:
             continue
         try:
@@ -1001,6 +1187,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 src_corners=args.src_corners,
                 dst_corners=args.dst_corners,
                 keep_group=keep_group,
+                rotate=args.rotate,
             )
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(result, encoding="utf-8")
