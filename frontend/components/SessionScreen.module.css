@@ -142,3 +142,16 @@
     height: auto;
     pointer-events: none;
   }
+
+  .discardCardBoardContent {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    top: 8px;
+    right: 2px;
+    pointer-events: none;
+  }

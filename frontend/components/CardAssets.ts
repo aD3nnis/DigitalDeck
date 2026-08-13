@@ -16,6 +16,9 @@ export function cardSrc(cardId: string, state: CardVisualState): string {
       return `/card-states/default/default_${cardId}.svg`;
   }
 }
+export function discardPileSrc(cardId: string): string {
+    return `/played-card-spots/discard-pile/default_${cardId}.svg`;
+  }
 export function visualState(opts: {
     selected: boolean;
     pending: boolean;

@@ -2,7 +2,7 @@
 
 import type { DiscardMode, GameMode, PlayMode } from "./types";
 import { useEffect, useState } from "react";
-import { cardSrc, visualState } from "./CardAssets";
+import { cardSrc, discardPileSrc, visualState } from "./CardAssets";
 import Card from "./Card";
 import styles from "./SessionScreen.module.css";
 
@@ -224,8 +224,10 @@ export default function SessionScreen({
               />
             </g>
           </svg>
-          <div className={styles.yourPlayBoardContent}>
-            {topDiscard && <Card cardId={topDiscard} />}
+          <div className={styles.discardCardBoardContent}>
+          {topDiscard && (
+            <img src={discardPileSrc(topDiscard)} alt={topDiscard} />
+          )}
           </div>
         </div>
       )}
