@@ -28,3 +28,12 @@ export function visualState(opts: {
     if (opts.selected) return "selected";
     return "default";
   }
+
+  export function playedSpotSrc(
+    seat: "plyr-bottom-center" | "plyr-top-center",
+    slotId: string,
+    cardId: string,
+  ): string {
+    const row = slotId.startsWith("t") ? "top-row" : "bottom-row";
+    return `/played-card-spots/${seat}/${row}/${slotId}/default_${cardId}.svg`;
+  }

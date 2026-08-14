@@ -1,5 +1,9 @@
+import type { SlotId } from "./Plyr1PlayBoard";
+
+export type PlayArea = Partial<Record<SlotId, string>>;
 export type GameMode = "TURN_ROTATION" | "FREE_ROTATION";
 export type DiscardMode = "DISCARD_OFF" | "TURN_DISCARD" | "FREE_DISCARD";
+
 
 export function isDiscardModeAllowed(
   gameMode: GameMode,

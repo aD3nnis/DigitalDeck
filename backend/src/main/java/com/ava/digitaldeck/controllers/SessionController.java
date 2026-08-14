@@ -226,7 +226,10 @@ public class SessionController {
         payload.put("cards", discarded);
         payload.put("topDiscard", topDiscard);
         payload.put("source", source);
-    
+        if ("PLAY".equals(source)) {
+            payload.put("playArea", deckService.getPlayArea(sessionId, request.playerId()));
+        }
+            
         messagingTemplate.convertAndSend(
                 "/topic/session/" + sessionId,
                 new SessionEvent("CARD_DISCARDED", sessionId, payload));
@@ -234,11 +237,15 @@ public class SessionController {
         turnService.clearPendingDrawn(sessionId, request.playerId());
         maybeAdvanceTurn(sessionId, advanceTurn);
 
-        return ResponseEntity.ok(Map.of(
-                "cards", discarded,
-                "topDiscard", topDiscard,
-                "source", source
-        ));
+        Map<String, Object> body = new HashMap<>();
+        body.put("cards", discarded);
+        body.put("topDiscard", topDiscard);
+        body.put("source", source);
+        if ("PLAY".equals(source)) {
+            body.put("playArea", payload.get("playArea"));
+        }
+        return ResponseEntity.ok(body);
+        
     }
 
     @PatchMapping("/{sessionId}/game-mode")
@@ -318,21 +325,28 @@ public class SessionController {
         if (cards == null || cards.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "no cards"));
         }
+        if (request.startSlot() == null || request.startSlot().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "no start slot"));
+        }
     
         TurnActionPolicy.Permit permit = turnActionPolicy.permitPlay(sessionId, request.playerId());
         if (permit instanceof TurnActionPolicy.Permit.Denied(String error)) {
             return ResponseEntity.status(403).body(Map.of("error", error));
         }
     
-        List<String> played = deckService.playCards(sessionId, request.playerId(), cards);
-        if (played.isEmpty() || played.size() != cards.size()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "card not in hand", "played", played));
+        DeckService.PlayAttempt attempt =
+                deckService.playCards(sessionId, request.playerId(), cards, request.startSlot());
+        if (!attempt.ok()) {
+            return ResponseEntity.badRequest().body(Map.of("error", attempt.error()));
         }
+    
+        Map<String, String> playArea = deckService.getPlayArea(sessionId, request.playerId());
     
         Map<String, Object> payload = new HashMap<>();
         payload.put("playerId", request.playerId());
-        payload.put("cards", played);
-        payload.put("playArea", deckService.getPlayArea(sessionId, request.playerId()));
+        payload.put("cards", attempt.played());
+        payload.put("playArea", playArea);
+        payload.put("startSlot", request.startSlot());
     
         messagingTemplate.convertAndSend(
                 "/topic/session/" + sessionId,
@@ -340,8 +354,9 @@ public class SessionController {
     
         // do NOT maybeAdvanceTurn
         return ResponseEntity.ok(Map.of(
-                "cards", played,
-                "playArea", payload.get("playArea")
+                "cards", attempt.played(),
+                "playArea", playArea,
+                "startSlot", request.startSlot()
         ));
     }
 

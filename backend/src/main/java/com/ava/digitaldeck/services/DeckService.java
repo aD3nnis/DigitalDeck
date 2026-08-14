@@ -103,23 +103,6 @@ public class DeckService {
         }
         return discarded;
     }
-    /** Moves one card from this player's play area → shared discard. */
-    public Optional<String> discardFromPlay(String sessionId, String playerId, String card) {
-        if (card == null || card.isBlank()) return Optional.empty();
-
-        String pKey = playKey(sessionId, playerId);
-        Long removed = redisTemplate.opsForList().remove(pKey, 1, card);
-        if (removed == null || removed == 0) {
-            return Optional.empty();
-        }
-
-        String discardKey = "session:" + sessionId + ":discard";
-        redisTemplate.opsForList().rightPush(discardKey, card);
-        redisTemplate.expire(discardKey, SESSION_TTL);
-        redisTemplate.expire(pKey, SESSION_TTL);
-
-        return Optional.of(card);
-    }
 
     public List<String> discardCardsFromPlay(String sessionId, String playerId, List<String> cards) {
         if (cards == null || cards.isEmpty()) return List.of();
@@ -133,26 +116,6 @@ public class DeckService {
         return discarded;
     }
 
-    /** Moves cards hand → this player's play area. Order preserved; last = end of their strip. */
-    public List<String> playCards(String sessionId, String playerId, List<String> cards) {
-        if (cards == null || cards.isEmpty()) return List.of();
-
-        String handKey = "session:" + sessionId + ":hands:" + playerId;
-        String pKey = playKey(sessionId, playerId);
-        List<String> played = new ArrayList<>();
-
-        for (String card : cards) {
-            if (card == null || card.isBlank()) break;
-            Long removed = redisTemplate.opsForList().remove(handKey, 1, card);
-            if (removed == null || removed == 0) break; // card not in hand
-            redisTemplate.opsForList().rightPush(pKey, card);
-            played.add(card);
-        }
-
-        redisTemplate.expire(handKey, SESSION_TTL);
-        redisTemplate.expire(pKey, SESSION_TTL);
-        return played;
-    }
     /** Top of discard = most recently discarded (rightmost). */
     public Optional<String> getTopDiscard(String sessionId) {
         String discardKey = "session:" + sessionId + ":discard";
@@ -222,19 +185,6 @@ public class DeckService {
         List<String> hand = redisTemplate.opsForList().range("session:" + sessionId + ":hands:" + playerId, 0, -1);
         return hand == null ? List.of() : hand;
     }
-    public List<String> getPlayArea(String sessionId, String playerId) {
-        List<String> cards = redisTemplate.opsForList().range(playKey(sessionId, playerId), 0, -1);
-        return cards == null ? List.of() : cards;
-    }
-    
-    public Map<String, List<String>> getAllPlayAreas(String sessionId, List<String> playerIds) {
-        Map<String, List<String>> areas = new HashMap<>();
-        if (playerIds == null) return areas;
-        for (String playerId : playerIds) {
-            areas.put(playerId, getPlayArea(sessionId, playerId));
-        }
-        return areas;
-    }
     private String playKey(String sessionId, String playerId) {
         return "session:" + sessionId + ":play:" + playerId;
     }
@@ -247,5 +197,107 @@ public class DeckService {
         for (String playerId : playerIds) {
             clearPlayArea(sessionId, playerId);
         }
+    }
+    public static final List<String> SLOT_IDS = List.of(
+        "t01", "t02", "t03", "t04", "t05", "t06", "t07", "t08",
+        "b01", "b02", "b03", "b04", "b05", "b06", "b07"
+    );
+
+    public record PlayAttempt(List<String> played, String error) {
+        public boolean ok() { return error == null; }
+    }
+
+    /** Moves cards hand → slots starting at startSlot, left-to-right, wrapping t08→b01. */
+    public PlayAttempt playCards(String sessionId, String playerId, List<String> cards, String startSlot) {
+        if (cards == null || cards.isEmpty()) {
+            return new PlayAttempt(List.of(), "no cards");
+        }
+        int start = SLOT_IDS.indexOf(startSlot);
+        if (start < 0) {
+            return new PlayAttempt(List.of(), "invalid slot");
+        }
+        if (start + cards.size() > SLOT_IDS.size()) {
+            return new PlayAttempt(List.of(), "not enough slots");
+        }
+
+        String pKey = playKey(sessionId, playerId);
+        Map<Object, Object> occupied = redisTemplate.opsForHash().entries(pKey);
+        for (int i = 0; i < cards.size(); i++) {
+            String slot = SLOT_IDS.get(start + i);
+            Object existing = occupied.get(slot);
+            if (existing != null && !existing.toString().isBlank()) {
+                return new PlayAttempt(List.of(), "slot occupied");
+            }
+        }
+
+        String handKey = "session:" + sessionId + ":hands:" + playerId;
+        List<String> hand = getHand(sessionId, playerId);
+        List<String> remainingHand = new ArrayList<>(hand);
+        for (String card : cards) {
+            if (card == null || card.isBlank()) {
+                return new PlayAttempt(List.of(), "card not in hand");
+            }
+            int at = remainingHand.indexOf(card);
+            if (at < 0) {
+                return new PlayAttempt(List.of(), "card not in hand");
+            }
+            remainingHand.remove(at);
+        }
+
+        // Commit only after every check passes (no partial fill).
+        for (String card : cards) {
+            redisTemplate.opsForList().remove(handKey, 1, card);
+        }
+        for (int i = 0; i < cards.size(); i++) {
+            redisTemplate.opsForHash().put(pKey, SLOT_IDS.get(start + i), cards.get(i));
+        }
+        redisTemplate.expire(handKey, SESSION_TTL);
+        redisTemplate.expire(pKey, SESSION_TTL);
+        return new PlayAttempt(List.copyOf(cards), null);
+    }
+
+    public Optional<String> discardFromPlay(String sessionId, String playerId, String card) {
+        if (card == null || card.isBlank()) return Optional.empty();
+
+        String pKey = playKey(sessionId, playerId);
+        Map<Object, Object> occupied = redisTemplate.opsForHash().entries(pKey);
+        String slotToClear = null;
+        for (String slot : SLOT_IDS) {
+            Object existing = occupied.get(slot);
+            if (card.equals(existing)) {
+                slotToClear = slot;
+                break;
+            }
+        }
+        if (slotToClear == null) return Optional.empty();
+
+        redisTemplate.opsForHash().delete(pKey, slotToClear);
+        String discardKey = "session:" + sessionId + ":discard";
+        redisTemplate.opsForList().rightPush(discardKey, card);
+        redisTemplate.expire(discardKey, SESSION_TTL);
+        redisTemplate.expire(pKey, SESSION_TTL);
+        return Optional.of(card);
+    }
+
+    /** Occupied slots only: { "b04": "AH", ... }. */
+    public Map<String, String> getPlayArea(String sessionId, String playerId) {
+        Map<Object, Object> raw = redisTemplate.opsForHash().entries(playKey(sessionId, playerId));
+        Map<String, String> area = new LinkedHashMap<>();
+        for (String slot : SLOT_IDS) {
+            Object card = raw.get(slot);
+            if (card != null && !card.toString().isBlank()) {
+                area.put(slot, card.toString());
+            }
+        }
+        return area;
+    }
+
+    public Map<String, Map<String, String>> getAllPlayAreas(String sessionId, List<String> playerIds) {
+        Map<String, Map<String, String>> areas = new HashMap<>();
+        if (playerIds == null) return areas;
+        for (String id : playerIds) {
+            areas.put(id, getPlayArea(sessionId, id));
+        }
+        return areas;
     }
 }

@@ -7,6 +7,8 @@ import LobbyScreen from "../components/LobbyScreen";
 import SessionScreen from "../components/SessionScreen";
 import type { DiscardMode, GameMode, PlayMode } from "../components/types";
 import { coerceDiscardMode, coercePlayMode } from "../components/types";
+import { SlotId } from "@/components/Plyr1PlayBoard";
+import type { PlayArea } from "../components/types";
 
 
 export default function Home() {
@@ -27,7 +29,7 @@ export default function Home() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [cardsPerPlayer, setCardsPerPlayer] = useState(0);
   const [playMode, setPlayMode] = useState<PlayMode>("PLAY_OFF");
-  const [playAreas, setPlayAreas] = useState<Record<string, string[]>>({});
+  const [playAreas, setPlayAreas] = useState<Record<string, PlayArea>>({});
   const handleGameModeChange = (next: GameMode) => {
     setGameMode(next);
     setDiscardMode((prev) => coerceDiscardMode(next, prev));
@@ -137,15 +139,11 @@ export default function Home() {
           }));
         } else if (event.type === "CARD_DISCARDED") {
           setTopDiscard(event.payload.topDiscard);
-          if (event.payload.source === "PLAY" && event.payload.playerId) {
-            setPlayAreas((prev) => {
-              const area = [...(prev[event.payload.playerId] ?? [])];
-              for (const card of event.payload.cards as string[]) {
-                const idx = area.indexOf(card);
-                if (idx !== -1) area.splice(idx, 1);
-              }
-              return { ...prev, [event.payload.playerId]: area };
-            });
+          if (event.payload.source === "PLAY" && event.payload.playArea) {
+            setPlayAreas((prev) => ({
+              ...prev,
+              [event.payload.playerId]: event.payload.playArea,
+            }));
           }
         } else if (event.type === "GAME_MODE_CHANGED") {
           setGameMode(event.payload.gameMode);
@@ -357,8 +355,9 @@ export default function Home() {
       return false;
     }
   
-    const { cards: discarded } = await res.json();
-  
+    const body = await res.json();
+    const discarded = body.cards;
+    
     if (source === "HAND") {
       setHand((prev) => {
         let next = [...prev];
@@ -368,25 +367,18 @@ export default function Home() {
         }
         return next;
       });
-    } else {
-      setPlayAreas((prev) => {
-        let area = [...(prev[playerId] ?? [])];
-        for (const card of discarded as string[]) {
-          const idx = area.indexOf(card);
-          if (idx !== -1) area = [...area.slice(0, idx), ...area.slice(idx + 1)];
-        }
-        return { ...prev, [playerId]: area };
-      });
+    } else if (body.playArea) {
+      setPlayAreas((prev) => ({ ...prev, [playerId]: body.playArea }));
     }
     return true;
   };
   
-  const playCards = async (cards: string[]): Promise<boolean> => {
+  const playCards = async (cards: string[], startSlot: SlotId): Promise<boolean> => {
     if (!sessionId || cards.length === 0) return false;
     const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/play`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, cards }),
+      body: JSON.stringify({ playerId, cards, startSlot }),
     });
     if (!res.ok) {
       const error = await res.json();

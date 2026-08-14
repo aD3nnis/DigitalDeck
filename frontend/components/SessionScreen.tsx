@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { cardSrc, discardPileSrc, visualState } from "./CardAssets";
 import Card from "./Card";
 import styles from "./SessionScreen.module.css";
+import Plyr1PlayBoard, { SLOT_IDS, type SlotId } from "./Plyr1PlayBoard";
+import type { PlayArea } from "./types";
 
 
 type Props = {
@@ -16,14 +18,15 @@ type Props = {
   remaining: number | null;
   discardMode: DiscardMode;
   playMode: PlayMode;
-  playAreas: Record<string, string[]>;
   topDiscard: string | null;
   onLeave: () => void;
   onDiscard: (cards: string[], source: "HAND" | "PLAY") => Promise<boolean>;
-  onPlay: (cards: string[]) => Promise<boolean>;
   statusMessage: string | null;
   onDraw: () => Promise<string | null>; // return drawn card, or null on fail
   onKeep: () => Promise<boolean>;
+  playAreas: Record<string, PlayArea>;
+  onPlay: (cards: string[], startSlot: SlotId) => Promise<boolean>;
+  
  
 };
 
@@ -65,7 +68,10 @@ export default function SessionScreen({
     return (-Math.floor(count / 2) + index) * FAN_DEG;
   }
 
-  const [playSelected, setPlaySelected] = useState<number[]>([]);
+  const [playSelected, setPlaySelected] = useState<SlotId[]>([]);
+  const myPlayArea = playAreas[playerId];
+
+
 
   const toggle = (i: number) => {
     setSelected((prev) => {
@@ -75,21 +81,12 @@ export default function SessionScreen({
     });
   };
 
-  const togglePlay = (i: number) => {
-    setPlaySelected((prev) => {
-      const at = prev.indexOf(i);
-      if (at !== -1) return prev.filter((_, j) => j !== at);
-      return [...prev, i];
-    });
-  };
-
-  const selectedCards = () => selected.map((i) => hand[i]);
-  const myPlayArea = playAreas[playerId]; // string[] | undefined
-  const selectedPlayCards = () =>
-    playSelected.map((i) => (myPlayArea ?? [])[i]);
-
   const [selected, setSelected] = useState<number[]>([]);
+  const selectedCards = () => selected.map((i) => hand[i]);
 
+  const selectedPlayCards = () =>
+    playSelected.map((s) => (myPlayArea ?? {})[s]).filter(Boolean) as string[];
+  
   const handleDrawDblClick = async () => {
     const card = await onDraw();
     if (!card) return;
@@ -141,6 +138,35 @@ export default function SessionScreen({
 
     const playerCount = seats.length;
     const isTwoPlayer = playerCount === 2;
+
+  const [selectedSlot, setSelectedSlot] = useState<SlotId | null>(null);
+
+function runFrom(start: SlotId, n: number): SlotId[] | null {
+  const i = SLOT_IDS.indexOf(start);
+  if (i < 0 || i + n > SLOT_IDS.length) return null;
+  return SLOT_IDS.slice(i, i + n);
+}
+
+const handlePlace = async (id: SlotId) => {
+  setSelectedSlot(id);
+  if (!canPlay || selected.length === 0) return;
+  const cards = selectedCards();
+  const run = runFrom(id, cards.length);
+  if (!run) {
+    alert("not enough slots");
+    return;
+  }
+  const occupied = myPlayArea ?? {};
+  if (run.some((s) => occupied[s])) {
+    alert("slot occupied");
+    return;
+  }
+  const ok = await onPlay(cards, id);
+  if (ok) {
+    setSelected([]);
+    setSelectedSlot(null);
+  }
+};
 
   useEffect(() => {
     if (pendingCard == null) return;
@@ -241,7 +267,6 @@ export default function SessionScreen({
       <h2>Players</h2>
       <ul className={styles.playAreaUnorderedList}>
       {orderedSeats.map(([id, name]) => {
-        const area = playAreas[id] ?? [];
         const isMine = id === playerId;
         return (
           <div key={id}>
@@ -253,59 +278,20 @@ export default function SessionScreen({
 
             {isMine ? (
               <div className={styles.yourPlayBoard}>
-                <svg
-                  className={styles.yourPlayBoardSvg}
-                  viewBox="0 0 350.29 100.91"
-                  aria-hidden="true"
-                >
-                  <g
-                    onDoubleClick={async () => {
-                      if (!canPlay || selected.length === 0) return;
-                      const cards = selectedCards();
-                      const ok = await onPlay(cards);
-                      if (ok) setSelected([]);
-                    }}
-                    style={{
-                      cursor:
-                        canPlay && selected.length > 0 ? "pointer" : undefined,
-                    }}
-                  >
-                    <path
-                      className={styles.trapFill}
-                      d="M313.46,5.65c-.13-.51-.58-.86-1.11-.86H38.06c-.52,0-.98.35-1.11.86L14.72,93.86c-.09.34-.01.7.21.98.22.28.55.44.9.44h318.76c.35,0,.68-.16.9-.44.22-.28.29-.64.21-.98l-22.24-88.2Z"
-                    />
-                    <path
-                      className={styles.trapStroke}
-                      d="M338.25,93.21l-22.24-88.2c-.42-1.68-1.93-2.85-3.66-2.85H38.06c-1.73,0-3.24,1.17-3.66,2.85L12.16,93.21c-.29,1.14-.04,2.32.68,3.25.72.93,1.81,1.46,2.98,1.46h318.76c1.17,0,2.26-.53,2.98-1.46.72-.93.97-2.11.68-3.25ZM335.49,94.84c-.22.28-.55.44-.9.44H15.82c-.35,0-.68-.16-.9-.44-.22-.28-.29-.64-.21-.98L36.95,5.65c.13-.51.58-.86,1.11-.86h274.29c.52,0,.98.35,1.11.86l22.24,88.2c.09.34.01.7-.21.98Z"
-                    />
-                  </g>
-                </svg>
-                <div className={styles.yourPlayBoardContent}>
-                  <ul className={styles.playCardUnorderedList}>
-                    {area.length === 0 ? (
-                      <li style={{ listStyle: "none" }}>(empty)</li>
-                    ) : (
-                      area.map((card, i) => {
-                        const order = playSelected.indexOf(i);
-                        const isSelected = order !== -1;
-                        return (
-                          <li
-                            className={styles.playCardList}
-                            key={`${id}-${card}-${i}`}
-                            style={{ listStyle: "none" }}
-                          >
-                            <Card
-                              cardId={card}
-                              selected={isSelected}
-                              order={isSelected ? order + 1 : undefined}
-                              onClick={() => togglePlay(i)}
-                            />
-                          </li>
-                        );
-                      })
-                    )}
-                  </ul>
-                </div>
+                <Plyr1PlayBoard
+                  occupied={playAreas[playerId] ?? {}}
+                  selectedSlot={selectedSlot}
+                  playSelected={playSelected}
+                  onSelectEmpty={(id) =>
+                    setSelectedSlot((prev) => (prev === id ? null : id))
+                  }
+                  onSelectOccupied={(id) =>
+                    setPlaySelected((prev) =>
+                      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+                    )
+                  }
+                  onPlace={handlePlace}
+                />
               </div>
               ) : (
                 <div className={styles.player2BoardTwoPlayerGame}>
@@ -323,19 +309,6 @@ export default function SessionScreen({
                       d="M89.91,45.98h170.27c1.48,0,2.8-.84,3.42-2.18.63-1.35.42-2.89-.53-4.03L232.21,2.99c-.72-.86-1.77-1.35-2.89-1.35h-108.66c-1.12,0-2.18.49-2.9,1.36l-30.74,36.78c-.95,1.14-1.15,2.68-.52,4.02.63,1.34,1.94,2.18,3.42,2.18ZM120.65,4.28h108.66c.34,0,.66.15.87.41l30.87,36.78c.43.52.23,1.06.16,1.22-.07.15-.36.66-1.04.66H89.91c-.67,0-.96-.5-1.03-.66-.07-.15-.27-.7.16-1.22L119.78,4.69c.22-.26.54-.41.88-.41Z"
                     />
                   </svg>
-                  <div className={styles.yourPlayBoardContent}>
-                    <ul className={styles.playCardUnorderedList}>
-                      {area.length === 0 ? (
-                        <li style={{ listStyle: "none" }}></li>
-                      ) : (
-                        area.map((card, i) => (
-                          <li key={`${id}-${card}-${i}`} style={{ listStyle: "none" }}>
-                            <Card cardId={card} />
-                          </li>
-                        ))
-                      )}
-                    </ul>
-                  </div>
                 </div>
               )}
           </div>

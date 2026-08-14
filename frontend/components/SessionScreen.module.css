@@ -22,15 +22,28 @@
 .yourPlayBoard {
     position: relative;
     width: 350px;
-    aspect-ratio: 350.29 / 100.91;
+    aspect-ratio: 326.32 / 95.76;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     padding: 0.5rem 1.5rem;
     box-sizing: border-box;
-    /* Rectangular box itself is not clickable — only the SVG trapezoid is. */
     pointer-events: none;
+  }
+  
+  .slotFill,
+  .slotStroke {
+    fill: #3d705e;
+    pointer-events: fill;
+  }
+  
+  .slotSelected .slotStroke {
+    fill: #5ac8fa;
+  }
+  
+  .slotGroup {
+    cursor: pointer;
   }
 
   .yourPlayBoardSvg {
@@ -154,4 +167,21 @@
     top: 8px;
     right: 2px;
     pointer-events: none;
+  }
+
+  .slotHit {
+    fill: transparent;
+    pointer-events: fill;
+  }
+  
+  /* occupied + selected: cyan ring on top of the warped card */
+  .slotSelected .slotStroke {
+    fill: #5ac8fa;
+  }
+
+  .slotOccupied:not(.slotSelected) .slotStroke {
+    fill: none;
+  }
+  .slotOccupied:not(.slotSelected) .slotFill {
+    fill: none;
   }
