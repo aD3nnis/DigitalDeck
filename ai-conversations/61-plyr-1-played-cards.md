@@ -1155,3 +1155,80 @@ const togglePlay = (id: SlotId) => {
 now look at my code again and tell me if anything is wrong
 ---
 ## Cursor
+This slice is in good shape. The earlier blockers are gone: `Plyr1PlayBoard` exports the board, `play()` uses `startSlot`, discard reads JSON once, `CARD_DISCARDED` stores the map, and the old list `playCards` is gone.
+
+What’s left is small.
+
+**Unused leftovers in `SessionScreen.tsx`**
+- `import Card from "./Card"` — nothing renders `<Card />` anymore
+- `cardStyle` — never called
+
+Safe to delete both. They won’t break the game.
+
+**Opponent board is empty on purpose**
+The other player’s trapezoid has no slots and no card images. You’ll see their plays in `playAreas`, but nothing draws them yet. That’s the `plyr-top-center` follow-up, not a bug in this slice.
+
+**Old Redis keys**
+If a session was started *before* this change, the play key might still be a list. A new game (or leaving and creating a fresh session) avoids a Redis type error.
+
+**Double-click vs click**
+Empty-slot click **toggles** selection. A double-click fires click → click → dblclick, so the slot may flash off, then `handlePlace` selects it and plays. Placement should still work. If it feels flaky, make single-click *set* the slot (`setSelectedSlot(id)`) instead of toggling.
+
+Try this: select AH in hand, click `b04` (cyan ring), double-click `b04`. The warped `default_AH.svg` should land on that spot. Multi-card from `t07` should wrap onto `b01`. Occupied/overflow should alert and not move cards.
+
+---
+## me
+what about this code?                   <ul className={styles.playCardUnorderedList}>
+                    {area.length === 0 ? (
+                      <li style={{ listStyle: "none" }}>(empty)</li>
+                    ) : (
+                      area.map((card, i) => {
+                        const order = playSelected.indexOf(i);
+                        const isSelected = order !== -1;
+                        return (
+                          <li
+                            className={styles.playCardList}
+                            key={`${id}-${card}-${i}`}
+                            style={{ listStyle: "none" }}
+                          >
+                            <Card
+                              cardId={card}
+                              selected={isSelected}
+                              order={isSelected ? order + 1 : undefined}
+                              onClick={() => togglePlay(i)}
+                            />
+                          </li>
+                        );
+                      })
+                    )}
+                  </ul>
+---
+## Cursor
+That’s the **old** play-area UI: a row of hand-style `Card`s. `Plyr1PlayBoard` already shows empty slots and warped images, so this overlay on **your** board should go.
+
+Delete this whole block under `Plyr1PlayBoard` (the `yourPlayBoardContent` wrapper and the `<ul>`):
+
+```303:328:frontend/components/SessionScreen.tsx
+                <div className={styles.yourPlayBoardContent}>
+                  <ul className={styles.playCardUnorderedList}>
+                    {area.length === 0 ? (
+                      ...
+                    ) : (
+                      area.map((card, i) => {
+                        ...
+                            <Card
+                              ...
+                              onClick={() => togglePlay(i)}
+                            />
+```
+
+Leave `Plyr1PlayBoard` as the only child of `.yourPlayBoard`.
+
+Why it breaks now:
+
+- `playAreas[id]` is a map `{ b04: "AH" }`, not an array, so `area.length` and `area.map` are wrong.
+- `area` isn’t even declared in that `orderedSeats.map` anymore (`const area = ...` was removed), so this is also an undefined-variable error.
+- `playSelected` is `SlotId[]`, so `playSelected.indexOf(i)` with a number doesn’t make sense.
+- `togglePlay(i)` was the old “click the Nth card in the list” helper.
+
+The opponent list a few lines below is the same idea. Either delete it until `plyr-top-center` exists, or show cards with `Object.values(playAreas[id] ?? {})` instead of `area.map`.
