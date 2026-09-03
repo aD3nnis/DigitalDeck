@@ -94,3 +94,77 @@ how about now
 --- 
 ## Cursor
 All good — **21/21** board SVGs now have the full set: `t01`–`t08` and `b01`–`b07`, no `t03-2` leftovers.
+
+---
+## me
+ok so lets do an overview now of what will happen per number of players and make sure we understand the goal. The boards themselves will not change locations per each persons perspective, the players may move but according the view boards just get added not differently positioned. so here is an example: a 2 player game so the game will look like this first screen shot. If a 3rd player gets added it will look like the second screenshot. If a fourth person gets added then it will look like the 3rd screenshot, if a fifth person gets added it will look like the fourth screen shot and so on. Can you see the pattern?
+
+---
+## Cursor
+Yes — the pattern is clear. Here’s the overview as I understand it.
+
+### Core rule
+**You always sit at the bottom** (`player-1` art). The table layout for a given player count is fixed on screen. People rotate into seats; the board graphics don’t spin so that “your” seat becomes a side board.
+
+When the lobby grows, you switch folders (`two-player/` → `three-player/` → …) and **more seat boards appear** around the table.
+
+### Seats by player count (clockwise from you)
+
+| Players | Folder | Screen seats (you first, then clockwise) |
+|---|---|---|
+| 1 | `one-player/` | bottom |
+| 2 | `two-player/` | bottom → **top** |
+| 3 | `three-player/` | bottom → **left** → **right** |
+| 4 | `four-player/` | bottom → left → **top** → right |
+| 5 | `five-player/` | bottom → left → **top-left** → **top-right** → right |
+| 6 | `six-player/` | bottom → left → top-left → **top** → top-right → right |
+
+That matches your screenshots:
+- **2p:** you + opponent across  
+- **3p:** you + two side boards (no across seat)  
+- **4p:** sides stay, **top comes back**  
+- **5p:** top splits into top-left + top-right  
+
+### What that means in code
+1. Pick folder from `roster` size: `` `${n}-player/` ``  
+2. Rotate seat order so **you are always seat 0** (bottom / `player-1-...svg`)  
+3. Assign everyone else clockwise to `player-2`, `player-3`, …  
+4. Draw/discard stay in the center on every layout  
+5. Only **your** board is interactive for placing cards; others are view-only (with overlapping slots still hittable for select/discard-from-play if you add that later)
+
+### One nuance
+**2 → 3 is a layout swap**, not a pure “add a piece”: the top seat goes away and left/right appear. From **3 → 6** it really does feel additive (sides stay put; top seats fill in).
+
+If that matches what you meant, next step is wiring a seat map (`playerCount` + `seatIndex` → SVG path + warped-card seat folder). A 6-player screenshot would close the loop if you have one.
+
+---
+## me
+this is a 6-player screenshot
+
+--- 
+## Cursor
+That locks it in. **6-player** is the full table:
+
+**bottom (you) → left → top-left → top → top-right → right**
+
+Mapped to files:
+
+| Seat (clockwise from you) | File |
+|---|---|
+| 1 bottom | `six-player/player-1-board-six-player-game.svg` |
+| 2 left | `player-2-...` (`bottom-left`) |
+| 3 top-left | `player-3-...` (`top-left`) |
+| 4 top | `player-4-...` (`top-center`) |
+| 5 top-right | `player-5-...` (`top-right`) |
+| 6 right | `player-6-...` (`bottom-right`) |
+
+So the full progression is:
+
+- **2:** bottom + top  
+- **3:** bottom + left + right  
+- **4:** bottom + left + top + right  
+- **5:** bottom + left + top-left + top-right + right  
+- **6:** bottom + left + top-left + top + top-right + right  
+
+Draw/discard stay center. You always get seat 1 art; everyone else fills clockwise. That matches all five screenshots.
+
