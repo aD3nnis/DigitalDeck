@@ -8,6 +8,7 @@ import styles from "./SessionScreen.module.css";
 import Plyr1PlayBoard, { SLOT_IDS, type SlotId } from "./Plyr1PlayBoard";
 import type { PlayArea } from "./types";
 import SixPlayerTable from "./SixPlayerTable";
+import FivePlayerTable from "./FivePlayerTable";
 
 
 type Props = {
@@ -289,9 +290,11 @@ const handlePlace = async (id: SlotId) => {
         </p>
       )}
 
-{playerCount !== 6 && !isTwoPlayer && drawDiscardSection}
-      {playerCount === 6 ? (
+{playerCount !== 6 && !isTwoPlayer && playerCount !== 5 && drawDiscardSection}
+{playerCount === 6 ? (
   <SixPlayerTable seatPlayerIds={seatPlayerIds} roster={roster} />
+) : playerCount === 5 ? (
+  <FivePlayerTable seatPlayerIds={seatPlayerIds} roster={roster} />
 ) : (
   <ul className={styles.playAreaUnorderedList}>
     {orderedSeats.map(([id, name]) => {
