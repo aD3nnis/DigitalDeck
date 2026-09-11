@@ -203,27 +203,52 @@
     height: auto;
     max-height: 100%;
   }
+  
+
 
   .handTop,
-.handTL,
-.handTR,
-.handL,
-.handR,
-.handBot {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: visible;
-}
-
-.handBackImg {
-  display: block;
-  width: 35px; /* bump if too small; warped SVGs are tall/narrow */
-  height: auto;
-  pointer-events: none;
-  user-select: none;
-}
-
-.handTop .handBackImg {
-  width: 34px; /* default upright is wider */
-}
+  .handTL,
+  .handTR,
+  .handL,
+  .handR,
+  .handBot {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: visible;
+    position: relative;
+  }
+  
+  /* Stack of backs — absolute children share one origin */
+  .opponentFan {
+    position: relative;
+    width: 40px;
+    height: 56px;
+  }
+  
+  .opponentFan .handBackImg {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    margin-left: -17px; /* half of ~34px width */
+    transform-origin: bottom center;
+    display: block;
+    width: 34px;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+  }
+  
+  .handTop .opponentFan .handBackImg {
+    width: 34px;
+    margin-left: -17px;
+  }
+  
+  /* Side / corner warped cards are taller — nudge box if needed */
+  .handL .opponentFan,
+  .handR .opponentFan,
+  .handTL .opponentFan,
+  .handTR .opponentFan {
+    width: 36px;
+    height: 70px;
+  }
