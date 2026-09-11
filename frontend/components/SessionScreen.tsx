@@ -275,6 +275,52 @@ const handlePlace = async (id: SlotId) => {
       )}
     </section>
   );
+  const myHandFan = (
+    <ul className={styles.handCardUnorderedList}>
+      {hand.map((card, i) => {
+        const order = selected.indexOf(i);
+        const isSelected = order !== -1;
+        const isPending = pendingIndex === i;
+        const src = cardSrc(
+          card,
+          visualState({ selected: isSelected, pending: isPending }),
+        );
+  
+        const n = hand.length;
+        const fanWidth = CARD_WIDTH + Math.max(0, n - 1) * FAN_STEP;
+        const originX = (HAND_WIDTH - fanWidth) / 2;
+        const angle = fanAngle(i, n);
+        const center = (n - 1) / 2;
+        const drop = Math.abs(i - center) * FAN_STEP_Y;
+  
+        return (
+          <li
+            key={`${card}-${i}`}
+            className={styles.handCard}
+            onClick={() => toggle(i)}
+            onDoubleClick={async (e) => {
+              e.preventDefault();
+              if (!keepEnabled || pendingIndex !== i) return;
+              const ok = await onKeep();
+              if (ok) {
+                setPendingCard(null);
+                setSelected([]);
+              }
+            }}
+            style={{
+              left: originX + i * FAN_STEP,
+              bottom: 8 - drop,
+              transform: `rotate(${angle}deg)`,
+              zIndex: i,
+            }}
+          >
+            <img src={src} alt={card} width={CARD_WIDTH} />
+            {isSelected && <span> ({order + 1})</span>}
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   return (
     <main>
@@ -289,10 +335,12 @@ const handlePlace = async (id: SlotId) => {
           {currentTurn === playerId && " (this is you!)"}
         </p>
       )}
-
+{playerCount !== 6 && (
+  <ul className={styles.playAreaUnorderedList}>{myHandFan}</ul>
+)}
 {playerCount !== 6 && !isTwoPlayer && playerCount !== 5 && drawDiscardSection}
 {playerCount === 6 ? (
-  <SixPlayerTable seatPlayerIds={seatPlayerIds} roster={roster} />
+  <SixPlayerTable seatPlayerIds={seatPlayerIds} handBot={myHandFan} roster={roster} />
 ) : playerCount === 5 ? (
   <FivePlayerTable seatPlayerIds={seatPlayerIds} roster={roster} />
 ) : (
@@ -349,54 +397,6 @@ const handlePlace = async (id: SlotId) => {
     })}
   </ul>
 )}
-      <ul className={styles.playAreaUnorderedList}>
-        <div className={styles.handCardUnorderedList}>
-        {hand.map((card, i) => {
-          const order = selected.indexOf(i);
-          const isSelected = order !== -1;
-          const isPending = pendingIndex === i;
-          const src = cardSrc(
-            card,
-            visualState({ selected: isSelected, pending: isPending }),
-          );
-
-          const n = hand.length;
-          const fanWidth = CARD_WIDTH + Math.max(0, n - 1) * FAN_STEP;
-          const originX = (HAND_WIDTH - fanWidth) / 2;
-          const angle = fanAngle(i, n);
-
-          const center = (n - 1) / 2;
-          const drop = Math.abs(i - center) * FAN_STEP_Y; 
-
-          return (
-            <li
-              key={`${card}-${i}`}
-              className={styles.handCard}
-              onClick={() => toggle(i)}
-              onDoubleClick={async (e) => {
-                e.preventDefault();
-                if (!keepEnabled || pendingIndex !== i) return;
-                const ok = await onKeep();
-                if (ok) {
-                  setPendingCard(null);
-                  setSelected([]);
-                }
-              }}
-              style={{
-                left: originX + i * FAN_STEP,
-                bottom: 8 - drop,
-                transform: `rotate(${angle}deg)`,
-                zIndex: i,
-              }}
-            >
-              <img src={src} alt={card} width={CARD_WIDTH} />
-              {isSelected && <span> ({order + 1})</span>}
-            </li>
-          );
-        })}
-        </div>
-      </ul>
-
       <button onClick={onLeave}>Leave session</button>
 
       <p>Cards remaining: {remaining}</p>
