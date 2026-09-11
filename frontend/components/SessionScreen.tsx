@@ -335,14 +335,22 @@ const handlePlace = async (id: SlotId) => {
           {currentTurn === playerId && " (this is you!)"}
         </p>
       )}
-{playerCount !== 6 && (
+{playerCount !== 6 && playerCount !== 5 && (
   <ul className={styles.playAreaUnorderedList}>{myHandFan}</ul>
 )}
 {playerCount !== 6 && !isTwoPlayer && playerCount !== 5 && drawDiscardSection}
 {playerCount === 6 ? (
-  <SixPlayerTable seatPlayerIds={seatPlayerIds} handBot={myHandFan} roster={roster} />
+  <SixPlayerTable
+    seatPlayerIds={seatPlayerIds}
+    roster={roster}
+    handBot={myHandFan}
+  />
 ) : playerCount === 5 ? (
-  <FivePlayerTable seatPlayerIds={seatPlayerIds} roster={roster} />
+  <FivePlayerTable
+    seatPlayerIds={seatPlayerIds}
+    roster={roster}
+    handBot={myHandFan}
+  />
 ) : (
   <ul className={styles.playAreaUnorderedList}>
     {orderedSeats.map(([id, name]) => {

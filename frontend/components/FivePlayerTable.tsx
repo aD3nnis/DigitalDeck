@@ -1,16 +1,97 @@
 "use client";
 
+import type { CSSProperties, ReactNode } from "react";
 import styles from "./FivePlayerTable.module.css";
 
 const FOLDER = "/board-parts/five-player";
+const HAND = "/cards-in-hand-spots";
+
+/** Match your six-player test knobs */
+const TEST_COUNT = 3;
+const STEP = 7;
+const DEG = -4;
 
 type Props = {
   /** Clockwise from you: [you, left, topLeft, topRight, right] */
   seatPlayerIds: string[];
   roster: Record<string, string>;
+  handBot?: ReactNode;
 };
 
-export default function FivePlayerTable({ seatPlayerIds, roster }: Props) {
+const SEAT_FAN = {
+  topLeft: {
+    dx: 0.1,
+    dy: -0.5,
+    rot: -1,
+    src: `${HAND}/plyrs-top-left-right/card-back-blue-left.svg`,
+  },
+  topRight: {
+    dx: -0.1,
+    dy: -0.5,
+    rot: 1,
+    src: `${HAND}/plyrs-top-left-right/card-back-blue-right.svg`,
+  },
+  left: {
+    dx: 0.1,
+    dy: -1.1,
+    rot: -1,
+    src: `${HAND}/plyrs-bottom-left-right/card-back-blue-left.svg`,
+  },
+  right: {
+    dx: -0.1,
+    dy: -1.1,
+    rot: 1,
+    src: `${HAND}/plyrs-bottom-left-right/card-back-blue-right.svg`,
+  },
+} as const;
+
+type SeatKey = keyof typeof SEAT_FAN;
+
+function backStyle(
+  i: number,
+  count: number,
+  fan: (typeof SEAT_FAN)[SeatKey],
+): CSSProperties {
+  const x = i * fan.dx * STEP;
+  const y = i * fan.dy * STEP;
+  const angle = i * fan.rot * DEG;
+  return {
+    transform: `translate(${x}px, ${y}px) rotate(${angle}deg)`,
+    zIndex: count - i,
+  };
+}
+
+function OpponentHand({
+  seat,
+  count = TEST_COUNT,
+  label,
+}: {
+  seat: SeatKey;
+  count?: number;
+  label: string;
+}) {
+  const fan = SEAT_FAN[seat];
+  return (
+    <div className={styles.opponentFan} aria-label={`${label} hand (${count})`}>
+      {Array.from({ length: count }, (_, i) => (
+        <img
+          key={i}
+          className={styles.handBackImg}
+          src={fan.src}
+          alt=""
+          draggable={false}
+          style={backStyle(i, count, fan)}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function FivePlayerTable({
+  seatPlayerIds,
+  roster,
+  handBot,
+}: Props) {
   const name = (i: number, fallback: string) => {
     const pid = seatPlayerIds[i];
     return pid ? roster[pid] ?? pid : fallback;
@@ -18,6 +99,13 @@ export default function FivePlayerTable({ seatPlayerIds, roster }: Props) {
 
   return (
     <div className={styles.table} aria-label="Five player table">
+      <div className={styles.handTL}>
+        <OpponentHand seat="topLeft" label="top-left" />
+      </div>
+      <div className={styles.handTR}>
+        <OpponentHand seat="topRight" label="top-right" />
+      </div>
+
       <div className={`${styles.seat} ${styles.topLeft}`}>
         <img
           className={styles.boardImg}
@@ -54,6 +142,9 @@ export default function FivePlayerTable({ seatPlayerIds, roster }: Props) {
         />
       </div>
 
+      <div className={styles.handML} aria-hidden />
+      <div className={styles.handMR} aria-hidden />
+
       <div className={`${styles.seat} ${styles.dealer}`}>
         <img
           className={styles.dealerImg}
@@ -61,6 +152,10 @@ export default function FivePlayerTable({ seatPlayerIds, roster }: Props) {
           alt="Dealer board"
           draggable={false}
         />
+      </div>
+
+      <div className={styles.handL}>
+        <OpponentHand seat="left" label="left" />
       </div>
 
       <div className={`${styles.seat} ${styles.left}`}>
@@ -81,6 +176,10 @@ export default function FivePlayerTable({ seatPlayerIds, roster }: Props) {
         />
       </div>
 
+      <div className={styles.handR}>
+        <OpponentHand seat="right" label="right" />
+      </div>
+
       <div className={`${styles.seat} ${styles.bottom}`}>
         <img
           className={styles.boardImg}
@@ -89,6 +188,8 @@ export default function FivePlayerTable({ seatPlayerIds, roster }: Props) {
           draggable={false}
         />
       </div>
+
+      <div className={styles.handBot}>{handBot}</div>
     </div>
   );
 }
