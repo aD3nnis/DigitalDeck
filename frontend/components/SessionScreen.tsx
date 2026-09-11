@@ -9,6 +9,10 @@ import Plyr1PlayBoard, { SLOT_IDS, type SlotId } from "./Plyr1PlayBoard";
 import type { PlayArea } from "./types";
 import SixPlayerTable from "./SixPlayerTable";
 import FivePlayerTable from "./FivePlayerTable";
+import FourPlayerTable from "./FourPlayerTable";
+import ThreePlayerTable from "./ThreePlayerTable";
+import TwoPlayerTable from "./TwoPlayerTable";
+import OnePlayerTable from "./OnePlayerTable";
 
 
 type Props = {
@@ -335,10 +339,6 @@ const handlePlace = async (id: SlotId) => {
           {currentTurn === playerId && " (this is you!)"}
         </p>
       )}
-{playerCount !== 6 && playerCount !== 5 && (
-  <ul className={styles.playAreaUnorderedList}>{myHandFan}</ul>
-)}
-{playerCount !== 6 && !isTwoPlayer && playerCount !== 5 && drawDiscardSection}
 {playerCount === 6 ? (
   <SixPlayerTable
     seatPlayerIds={seatPlayerIds}
@@ -351,59 +351,30 @@ const handlePlace = async (id: SlotId) => {
     roster={roster}
     handBot={myHandFan}
   />
+) : playerCount === 4 ? (
+  <FourPlayerTable
+    seatPlayerIds={seatPlayerIds}
+    roster={roster}
+    handBot={myHandFan}
+  />
+) : playerCount === 3 ? (
+  <ThreePlayerTable
+    seatPlayerIds={seatPlayerIds}
+    roster={roster}
+    handBot={myHandFan}
+  />
+) : playerCount === 2 ? (
+  <TwoPlayerTable
+    seatPlayerIds={seatPlayerIds}
+    roster={roster}
+    handBot={myHandFan}
+  />
 ) : (
-  <ul className={styles.playAreaUnorderedList}>
-    {orderedSeats.map(([id, name]) => {
-      const isMine = id === playerId;
-      return (
-        <div key={id}>
-          {isTwoPlayer && isMine && drawDiscardSection}
-          <h3>
-            {name + "'s play area"}
-            {isMine ? " (you)" : ""}
-          </h3>
-
-          {isMine ? (
-            <div className={styles.yourPlayBoard}>
-              <Plyr1PlayBoard
-                occupied={playAreas[playerId] ?? {}}
-                selectedSlot={selectedSlot}
-                playSelected={playSelected}
-                onSelectEmpty={(id) =>
-                  setSelectedSlot((prev) => (prev === id ? null : id))
-                }
-                onSelectOccupied={(id) =>
-                  setPlaySelected((prev) =>
-                    prev.includes(id)
-                      ? prev.filter((s) => s !== id)
-                      : [...prev, id],
-                  )
-                }
-                onPlace={handlePlace}
-              />
-            </div>
-          ) : (
-            <div className={styles.player2BoardTwoPlayerGame}>
-              <svg
-                className={styles.yourPlayBoardSvg}
-                viewBox="0 0 350 47.4"
-                aria-hidden="true"
-              >
-                <path
-                  className={styles.trapFill}
-                  d="M88.88,42.69c.07.15.36.66,1.03.66h170.27c.68,0,.96-.5,1.04-.66.07-.15.27-.7-.16-1.22l-30.87-36.78c-.22-.26-.54-.41-.87-.41h-108.66c-.34,0-.66.15-.88.41l-30.74,36.78c-.43.52-.23,1.06-.16,1.22Z"
-                />
-                <path
-                  className={styles.trapStroke}
-                  d="M89.91,45.98h170.27c1.48,0,2.8-.84,3.42-2.18.63-1.35.42-2.89-.53-4.03L232.21,2.99c-.72-.86-1.77-1.35-2.89-1.35h-108.66c-1.12,0-2.18.49-2.9,1.36l-30.74,36.78c-.95,1.14-1.15,2.68-.52,4.02.63,1.34,1.94,2.18,3.42,2.18ZM120.65,4.28h108.66c.34,0,.66.15.87.41l30.87,36.78c.43.52.23,1.06.16,1.22-.07.15-.36.66-1.04.66H89.91c-.67,0-.96-.5-1.03-.66-.07-.15-.27-.7.16-1.22L119.78,4.69c.22-.26.54-.41.88-.41Z"
-                />
-              </svg>
-            </div>
-          )}
-        </div>
-      );
-    })}
-  </ul>
+  <OnePlayerTable
+    seatPlayerIds={seatPlayerIds}
+    roster={roster}
+    handBot={myHandFan}
+  />
 )}
       <button onClick={onLeave}>Leave session</button>
 

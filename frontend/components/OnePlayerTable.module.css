@@ -1,0 +1,99 @@
+.table {
+    --table-w: min(350px, 96vw);
+    width: var(--table-w);
+    height: 715px;
+  
+    display: grid;
+    margin: 0 auto;
+    grid-template-columns: 40fr 40fr 97fr 97fr 40fr 40fr;
+    /* blanks: handTop, top, sides */
+    grid-template-rows: 117px 80px 46px 40fr 36fr 96fr 165fr;
+    grid-template-areas:
+      ".      .      .       .       .      ."
+      ".      .      .       .       .      ."
+      ".      .      .       .       .      ."
+      ".      .      draw    discard .      ."
+      ".      .      dealer  dealer  .      ."
+      "bottom bottom bottom  bottom  bottom bottom"
+      "handBot handBot handBot handBot handBot handBot";
+    column-gap: 0;
+    row-gap: 0;
+    align-items: center;
+    justify-items: center;
+    background: #002e08;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  .table > * {
+    min-width: 0;
+    min-height: 0;
+  }
+  
+  .seat {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    position: relative;
+  }
+  
+  .dealer {
+    grid-area: dealer;
+    width: 100%;
+    max-width: 280px;
+    margin-top: 5px;
+  }
+  
+  .bottom {
+    grid-area: bottom;
+    width: 93%;
+  }
+  
+  .draw {
+    grid-area: draw;
+    z-index: 2;
+    justify-self: end;
+    align-self: end;
+    width: auto;
+    margin-right: 5px;
+  }
+  
+  .discard {
+    grid-area: discard;
+    z-index: 2;
+    justify-self: start;
+    align-self: end;
+    width: auto;
+    margin-left: 5px;
+  }
+  
+  .handBot {
+    grid-area: handBot;
+    z-index: 3;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: visible;
+    position: relative;
+  }
+  
+  .boardImg,
+  .dealerImg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+  }
+  
+  .pileImg {
+    display: block;
+    width: 44px;
+    height: auto;
+    pointer-events: auto;
+    user-select: none;
+  }
