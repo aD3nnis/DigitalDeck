@@ -7,12 +7,7 @@ import Card from "./Card";
 import styles from "./SessionScreen.module.css";
 import Plyr1PlayBoard, { SLOT_IDS, type SlotId } from "./Plyr1PlayBoard";
 import type { PlayArea } from "./types";
-import SixPlayerTable from "./SixPlayerTable";
-import FivePlayerTable from "./FivePlayerTable";
-import FourPlayerTable from "./FourPlayerTable";
-import ThreePlayerTable from "./ThreePlayerTable";
-import TwoPlayerTable from "./TwoPlayerTable";
-import OnePlayerTable from "./OnePlayerTable";
+import GameTable from "./GameTable";
 
 
 type Props = {
@@ -339,43 +334,12 @@ const handlePlace = async (id: SlotId) => {
           {currentTurn === playerId && " (this is you!)"}
         </p>
       )}
-{playerCount === 6 ? (
-  <SixPlayerTable
-    seatPlayerIds={seatPlayerIds}
-    roster={roster}
-    handBot={myHandFan}
-  />
-) : playerCount === 5 ? (
-  <FivePlayerTable
-    seatPlayerIds={seatPlayerIds}
-    roster={roster}
-    handBot={myHandFan}
-  />
-) : playerCount === 4 ? (
-  <FourPlayerTable
-    seatPlayerIds={seatPlayerIds}
-    roster={roster}
-    handBot={myHandFan}
-  />
-) : playerCount === 3 ? (
-  <ThreePlayerTable
-    seatPlayerIds={seatPlayerIds}
-    roster={roster}
-    handBot={myHandFan}
-  />
-) : playerCount === 2 ? (
-  <TwoPlayerTable
-    seatPlayerIds={seatPlayerIds}
-    roster={roster}
-    handBot={myHandFan}
-  />
-) : (
-  <OnePlayerTable
-    seatPlayerIds={seatPlayerIds}
-    roster={roster}
-    handBot={myHandFan}
-  />
-)}
+<GameTable
+  playerCount={playerCount}
+  seatPlayerIds={seatPlayerIds}
+  roster={roster}
+  handBot={myHandFan}
+/>
       <button onClick={onLeave}>Leave session</button>
 
       <p>Cards remaining: {remaining}</p>
