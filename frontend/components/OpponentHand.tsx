@@ -5,69 +5,90 @@ import styles from "./OpponentHand.module.css";
 import type { SeatKey } from "./tableLayouts";
 
 const HAND = "/cards-in-hand-spots";
+const CARD_WIDTH = 34; // match .handBackImg width
 
-/** Swap for real handCounts later */
-export const TEST_HAND_COUNT = 3;
-const STEP = 7;
-const DEG = -4;
+type SeatFan = {
+  mode: "centered" | "fromFirst";
+  stepX: number;
+  stepY: number;
+  deg: number;
+  src: string;
+};
 
-const SEAT_FAN: Record<
-  Exclude<SeatKey, "bottom">,
-  { dx: number; dy: number; rot: number; src: string }
-> = {
+const SEAT_FAN: Record<Exclude<SeatKey, "bottom">, SeatFan> = {
   top: {
-    dx: -0.5,
-    dy: 0,
-    rot: 1,
+    mode: "centered",
+    stepX: 3,
+    stepY: -0.5,
+    deg: 3,
     src: `${HAND}/default/card-back-blue.svg`,
   },
+  // sides: grow from first card (old behavior), still a fan
   topLeft: {
-    dx: 0.1,
-    dy: -0.5,
-    rot: -1,
+    mode: "fromFirst",
+    stepX: 0.1 * 7,   // same idea as dx * STEP
+    stepY: -0.5 * 7,
+    deg: (-1) * -4,   // same idea as rot * DEG
     src: `${HAND}/plyrs-top-left-right/card-back-blue-left.svg`,
   },
   topRight: {
-    dx: -0.1,
-    dy: -0.5,
-    rot: 1,
+    mode: "fromFirst",
+    stepX: -0.1 * 7,
+    stepY: -0.5 * 7,
+    deg: (1) * -4,
     src: `${HAND}/plyrs-top-left-right/card-back-blue-right.svg`,
   },
   left: {
-    dx: 0.1,
-    dy: -1.1,
-    rot: -1,
+    mode: "fromFirst",
+    stepX: 0.1 * 7,
+    stepY: -1.1 * 7,
+    deg: (-1) * -4,
     src: `${HAND}/plyrs-bottom-left-right/card-back-blue-left.svg`,
   },
   right: {
-    dx: -0.1,
-    dy: -1.1,
-    rot: 1,
+    mode: "fromFirst",
+    stepX: -0.1 * 7,
+    stepY: -1.1 * 7,
+    deg: (1) * -4,
     src: `${HAND}/plyrs-bottom-left-right/card-back-blue-right.svg`,
   },
 };
 
-function backStyle(
-  i: number,
-  count: number,
-  fan: (typeof SEAT_FAN)[Exclude<SeatKey, "bottom">],
-): CSSProperties {
+function fanOffset(index: number, count: number): number {
+  return -Math.floor(count / 2) + index; // only for centered
+}
+
+function backStyle(i: number, count: number, fan: SeatFan): CSSProperties {
+  if (fan.mode === "centered") {
+    const k = fanOffset(i, count);
+    const center = (count - 1) / 2;
+    const drop = Math.abs(i - center) * fan.stepY;
+    const fanWidth = CARD_WIDTH + Math.max(0, count - 1) * Math.abs(fan.stepX);
+    const originX = -fanWidth / 2 + CARD_WIDTH / 2;
+
+    return {
+      transform: `translate(${originX + i * fan.stepX}px, ${-drop}px) rotate(${k * fan.deg}deg)`,
+      zIndex: i,
+    };
+  }
+
+  // fromFirst: card 0 stays put; i=1,2,… stack further (your old model)
   return {
-    transform: `translate(${i * fan.dx * STEP}px, ${i * fan.dy * STEP}px) rotate(${i * fan.rot * DEG}deg)`,
+    transform: `translate(${i * fan.stepX}px, ${i * fan.stepY}px) rotate(${i * fan.deg}deg)`,
     zIndex: count - i,
   };
 }
 
 type Props = {
   seat: Exclude<SeatKey, "bottom">;
-  count: number; // required — no TEST_HAND_COUNT default
+  count: number;
   label: string;
 };
 
 export default function OpponentHand({ seat, count, label }: Props) {
   const fan = SEAT_FAN[seat];
   const isUpright = seat === "top";
-  if (count <= 0) return null; // empty hand = no backs
+  if (count <= 0) return null;
 
   return (
     <div
