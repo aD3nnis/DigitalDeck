@@ -66,12 +66,11 @@ public class SessionSocketController {
             );
             messagingTemplate.convertAndSend("/topic/session/" + sessionId, joinEvent);
         }
-        SessionEvent rosterEvent = new SessionEvent(
-                "ROSTER",
-                sessionId,
-                sessionService.getPlayers(sessionId)
-        );
-        messagingTemplate.convertAndSend("/topic/session/" + sessionId, rosterEvent);
+        Map<String, Object> rosterPayload = new HashMap<>();
+        rosterPayload.put("players", sessionService.getPlayers(sessionId));
+        rosterPayload.put("playerOrder", sessionService.getPlayerOrder(sessionId));
+        messagingTemplate.convertAndSend("/topic/session/" + sessionId,
+                new SessionEvent("ROSTER", sessionId, rosterPayload));
 
         Map<String, String> hostPayload = new HashMap<>();
         hostPayload.put("playerId", sessionService.getHost(sessionId).orElse(null));
@@ -109,6 +108,7 @@ public class SessionSocketController {
                 started && mode == GameMode.TURN_ROTATION
                         ? turnService.getCurrentPlayer(sessionId).orElse(null)
                         : null);
+        gameState.put("playerOrder", sessionService.getPlayerOrder(sessionId));
         
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                 new SessionEvent("GAME_STATE", sessionId, gameState));

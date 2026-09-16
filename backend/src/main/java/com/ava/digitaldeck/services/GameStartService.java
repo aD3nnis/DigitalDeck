@@ -88,6 +88,7 @@ public class GameStartService {
                 initPayload.put("gameMode", mode.name());
                 initPayload.put("cardsPerPlayer", cardsPerPlayer);
                 initPayload.put("handCounts", deckService.getHandCounts(sessionId, playerOrder));
+                initPayload.put("playerOrder", playerOrder);
                 
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                         new SessionEvent("DECK_INITIALIZED", sessionId, initPayload));

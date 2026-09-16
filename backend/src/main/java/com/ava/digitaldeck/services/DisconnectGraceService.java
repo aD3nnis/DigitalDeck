@@ -82,8 +82,11 @@ public class DisconnectGraceService {
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
                 new SessionEvent("PLAYER_LEFT", sessionId, Map.of("playerId", playerId)));
     
+        Map<String, Object> rosterPayload = new HashMap<>();
+        rosterPayload.put("players", sessionService.getPlayers(sessionId));
+        rosterPayload.put("playerOrder", sessionService.getPlayerOrder(sessionId));
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                new SessionEvent("ROSTER", sessionId, sessionService.getPlayers(sessionId)));
+                new SessionEvent("ROSTER", sessionId, rosterPayload));
     
         if (mode == GameMode.TURN_ROTATION) {
             Map<String, String> turnPayload = new HashMap<>();

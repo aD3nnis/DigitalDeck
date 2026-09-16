@@ -12,6 +12,7 @@ import GameTable from "./GameTable";
 
 type Props = {
   roster: Record<string, string>;
+  playerOrder: string[];
   playerId: string;
   gameMode: GameMode;
   currentTurn: string | null;
@@ -33,6 +34,7 @@ type Props = {
 
 export default function SessionScreen({
   roster,
+  playerOrder,
   playerId,
   gameMode,
   currentTurn,
@@ -150,11 +152,9 @@ export default function SessionScreen({
       ? seats
       : [...seats.slice(myIndex + 1), ...seats.slice(0, myIndex + 1)];
 
-      const seatPlayerIds = seatsClockwiseFromMe(roster, playerId);
-      const playerCount = Object.keys(roster).length;
-      
-    const isTwoPlayer = playerCount === 2;
-
+  const turnOrderIds =
+    playerOrder.length > 0 ? playerOrder : Object.keys(roster);
+  const playerCount = turnOrderIds.length;
   const [selectedSlot, setSelectedSlot] = useState<SlotId | null>(null);
 
 function runFrom(start: SlotId, n: number): SlotId[] | null {
@@ -336,8 +336,9 @@ const handlePlace = async (id: SlotId) => {
         </p>
       )}
         <GameTable
-          playerCount={playerCount}
-          seatPlayerIds={seatPlayerIds}
+          playerCount={turnOrderIds.length}
+          turnOrderIds={turnOrderIds}
+          viewerId={playerId}
           roster={roster}
           handBot={myHandFan}
           handCounts={handCounts}

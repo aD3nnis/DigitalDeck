@@ -3,7 +3,8 @@
 import { useState, type ReactNode } from "react";
 import OpponentHand from "./OpponentHand";
 import SelectablePileBoard from "./SelectablePileBoard";
-import { LAYOUTS, type SeatKey } from "./tableLayouts";
+import { LAYOUTS, screenPlayersBySeat, ABSOLUTE, type SeatKey } from "./tableLayouts";
+
 
 import styles1 from "./OnePlayerTable.module.css";
 import styles2 from "./TwoPlayerTable.module.css";
@@ -23,13 +24,15 @@ const STYLES = {
 
 type Props = {
   playerCount: number;
-  seatPlayerIds: string[];
+  turnOrderIds: string[];
+  viewerId: string;
   roster: Record<string, string>;
   handBot?: ReactNode;
   handCounts?: Record<string, number>;
   canDraw?: boolean;
   onDraw?: () => void;
 };
+
 
 const HAND_CLASS: Record<string, string> = {
   handTop: "handTop",
@@ -50,8 +53,9 @@ const SEAT_CLASS: Record<SeatKey, string> = {
 
 export default function GameTable({
   playerCount,
-  seatPlayerIds,
-  roster,
+  turnOrderIds,
+  viewerId,
+  roster, // add this
   handBot,
   handCounts,
   canDraw = false,
@@ -62,30 +66,25 @@ export default function GameTable({
   const styles = STYLES[n];
   const layout = LAYOUTS[n];
 
-  const order: SeatKey[] =
-    n === 6
-      ? ["bottom", "left", "topLeft", "top", "topRight", "right"]
-      : n === 5
-        ? ["bottom", "left", "topLeft", "topRight", "right"]
-        : n === 4
-          ? ["bottom", "left", "top", "right"]
-          : n === 3
-            ? ["bottom", "left", "right"]
-            : n === 2
-              ? ["bottom", "top"]
-              : ["bottom"];
-
+  const bySeat = screenPlayersBySeat(turnOrderIds, viewerId);
+  
+  const pidAt = (seat: SeatKey) => bySeat[seat];
+  
   const countForSeat = (seat: SeatKey) => {
-    const i = order.indexOf(seat);
-    const pid = i >= 0 ? seatPlayerIds[i] : undefined;
-    if (!pid) return 0;
-    return handCounts?.[pid] ?? 0;
+    const pid = pidAt(seat);
+    return pid ? handCounts?.[pid] ?? 0 : 0;
   };
-
+  
   const name = (seat: SeatKey, fallback: string) => {
-    const i = order.indexOf(seat);
-    const pid = i >= 0 ? seatPlayerIds[i] : undefined;
+    const pid = pidAt(seat);
     return pid ? roster[pid] ?? pid : fallback;
+  };
+  
+  const seatNumber = (seat: SeatKey) => {
+    const pid = pidAt(seat);
+    if (!pid) return 0;
+    // stable number = position in turn order (1..n), not screen position
+    return turnOrderIds.indexOf(pid) + 1;
   };
   
 
@@ -93,11 +92,10 @@ export default function GameTable({
     const file = layout.boards[seat];
     if (!file) return null;
     const cls = SEAT_CLASS[seat];
-    const seatNumber = order.indexOf(seat) + 1; // 1–6
     return (
       <div key={seat} className={`${styles.seat} ${styles[cls as keyof typeof styles]}`}>
         <span className={styles.playerLabel}>
-          {name(seat, seat)} ({seatNumber})
+          {name(seat, seat)} ({seatNumber(seat)})
         </span>
         <img
           className={styles.boardImg}

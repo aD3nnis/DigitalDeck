@@ -18,6 +18,7 @@ export default function Home() {
   const [code, setCode] = useState<string | null>(null);
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const [roster, setRoster] = useState<Record<string, string>>({});
+  const [playerOrder, setPlayerOrder] = useState<string[]>([]);
   const [currentTurn, setCurrentTurn] = useState<string | null>(null);
   const [hostId, setHostId] = useState<string | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
@@ -102,7 +103,11 @@ export default function Home() {
       (message) => {
         const event = JSON.parse(message.body);
         if (event.type === "ROSTER") {
-          setRoster(event.payload);
+          const players = event.payload.players ?? event.payload;
+          setRoster(players);
+          if (event.payload.playerOrder) {
+            setPlayerOrder(event.payload.playerOrder);
+          }
         } else if (event.type === "HOST_CHANGED") {
           setHostId(event.payload.playerId);
         } else if (event.type === "DECK_INITIALIZED") {
@@ -114,6 +119,9 @@ export default function Home() {
           }
           if (event.payload.handCounts) {
             setHandCounts(event.payload.handCounts);
+          }
+          if (event.payload.playerOrder) {
+            setPlayerOrder(event.payload.playerOrder);
           }
           rehydrateHand(resolvedSessionId); // dealt hands land here
         } else if (event.type === "GAME_STATE") {
@@ -129,6 +137,9 @@ export default function Home() {
           }
           if (event.payload.handCounts) {
             setHandCounts(event.payload.handCounts);
+          }
+          if (event.payload.playerOrder) {
+            setPlayerOrder(event.payload.playerOrder);
           }
           if (event.payload.gameStarted) {
             rehydrateHand(resolvedSessionId);
@@ -540,6 +551,7 @@ export default function Home() {
   return (
     <SessionScreen
       roster={roster}
+      playerOrder={playerOrder}
       playerId={playerId}
       gameMode={gameMode}
       currentTurn={currentTurn}
