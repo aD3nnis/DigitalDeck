@@ -169,6 +169,9 @@ public class SessionController {
         payload.put("remaining", deckService.remainingCount(sessionId));
         payload.put("reshuffled", result.reshuffled());
         payload.put("topDiscard", topDiscard);
+        payload.put("handCount", deckService.handSize(sessionId, request.playerId()));
+        // optional but nice for joiners mid-hand:
+        payload.put("handCounts", deckService.getHandCounts(sessionId, sessionService.getPlayerOrder(sessionId)));
 
         messagingTemplate.convertAndSend(
                 "/topic/session/" + sessionId,
@@ -228,6 +231,9 @@ public class SessionController {
         payload.put("source", source);
         if ("PLAY".equals(source)) {
             payload.put("playArea", deckService.getPlayArea(sessionId, request.playerId()));
+        }
+        if ("HAND".equals(source)) {
+            payload.put("handCount", deckService.handSize(sessionId, request.playerId()));
         }
             
         messagingTemplate.convertAndSend(
@@ -347,6 +353,8 @@ public class SessionController {
         payload.put("cards", attempt.played());
         payload.put("playArea", playArea);
         payload.put("startSlot", request.startSlot());
+        payload.put("handCount", deckService.handSize(sessionId, request.playerId()));
+        payload.put("handCounts", deckService.getHandCounts(sessionId, sessionService.getPlayerOrder(sessionId)));
     
         messagingTemplate.convertAndSend(
                 "/topic/session/" + sessionId,

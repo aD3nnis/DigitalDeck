@@ -83,12 +83,14 @@ public class GameStartService {
         GameMode mode = sessionService.getGameMode(sessionId);
         long remaining = deckService.remainingCount(sessionId);
 
+        Map<String, Object> initPayload = new HashMap<>();
+                initPayload.put("remaining", remaining);
+                initPayload.put("gameMode", mode.name());
+                initPayload.put("cardsPerPlayer", cardsPerPlayer);
+                initPayload.put("handCounts", deckService.getHandCounts(sessionId, playerOrder));
+                
         messagingTemplate.convertAndSend("/topic/session/" + sessionId,
-                new SessionEvent("DECK_INITIALIZED", sessionId, Map.of(
-                        "remaining", remaining,
-                        "gameMode", mode.name(),
-                        "cardsPerPlayer", cardsPerPlayer
-                )));
+                        new SessionEvent("DECK_INITIALIZED", sessionId, initPayload));
 
         String currentPlayer = null;
         if (mode == GameMode.TURN_ROTATION) {

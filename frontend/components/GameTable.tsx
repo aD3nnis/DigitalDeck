@@ -25,6 +25,7 @@ type Props = {
   seatPlayerIds: string[];
   roster: Record<string, string>;
   handBot?: ReactNode;
+  handCounts?: Record<string, number>;
 };
 
 const HAND_CLASS: Record<string, string> = {
@@ -49,28 +50,38 @@ export default function GameTable({
   seatPlayerIds,
   roster,
   handBot,
+  handCounts,
 }: Props) {
   const n = Math.min(6, Math.max(1, playerCount)) as 1 | 2 | 3 | 4 | 5 | 6;
   const styles = STYLES[n];
   const layout = LAYOUTS[n];
 
+  const order: SeatKey[] =
+    n === 6
+      ? ["bottom", "left", "topLeft", "top", "topRight", "right"]
+      : n === 5
+        ? ["bottom", "left", "topLeft", "topRight", "right"]
+        : n === 4
+          ? ["bottom", "left", "top", "right"]
+          : n === 3
+            ? ["bottom", "left", "right"]
+            : n === 2
+              ? ["bottom", "top"]
+              : ["bottom"];
+
+  const countForSeat = (seat: SeatKey) => {
+    const i = order.indexOf(seat);
+    const pid = i >= 0 ? seatPlayerIds[i] : undefined;
+    if (!pid) return 0;
+    return handCounts?.[pid] ?? 0;
+  };
+
   const name = (seat: SeatKey, fallback: string) => {
-    const order: SeatKey[] =
-      n === 6
-        ? ["bottom", "left", "topLeft", "top", "topRight", "right"]
-        : n === 5
-          ? ["bottom", "left", "topLeft", "topRight", "right"]
-          : n === 4
-            ? ["bottom", "left", "top", "right"]
-            : n === 3
-              ? ["bottom", "left", "right"]
-              : n === 2
-                ? ["bottom", "top"]
-                : ["bottom"];
     const i = order.indexOf(seat);
     const pid = i >= 0 ? seatPlayerIds[i] : undefined;
     return pid ? roster[pid] ?? pid : fallback;
   };
+  
 
   const board = (seat: SeatKey) => {
     const file = layout.boards[seat];
@@ -95,7 +106,11 @@ export default function GameTable({
           key={slot}
           className={styles[HAND_CLASS[slot] as keyof typeof styles]}
         >
-          <OpponentHand seat={seat!} label={seat!} />
+          <OpponentHand
+            seat={seat!}
+            label={seat!}
+            count={countForSeat(seat!)}
+          />
         </div>
       ))}
 

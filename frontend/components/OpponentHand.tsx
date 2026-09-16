@@ -60,17 +60,14 @@ function backStyle(
 
 type Props = {
   seat: Exclude<SeatKey, "bottom">;
-  count?: number;
+  count: number; // required — no TEST_HAND_COUNT default
   label: string;
 };
 
-export default function OpponentHand({
-  seat,
-  count = TEST_HAND_COUNT,
-  label,
-}: Props) {
+export default function OpponentHand({ seat, count, label }: Props) {
   const fan = SEAT_FAN[seat];
   const isUpright = seat === "top";
+  if (count <= 0) return null; // empty hand = no backs
 
   return (
     <div

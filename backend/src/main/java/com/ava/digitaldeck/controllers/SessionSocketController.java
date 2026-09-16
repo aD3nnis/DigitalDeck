@@ -91,6 +91,12 @@ public class SessionSocketController {
         } else {
             gameState.put("playAreas", Map.of());
         }
+        if (started) {
+            gameState.put("handCounts",
+                    deckService.getHandCounts(sessionId, sessionService.getPlayerOrder(sessionId)));
+        } else {
+            gameState.put("handCounts", Map.of());
+        }
         gameState.put("gameStarted", started);
         gameState.put("gameMode", mode.name());
         gameState.put("discardMode", discardMode.name());

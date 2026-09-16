@@ -21,8 +21,6 @@ export default function Home() {
   const [currentTurn, setCurrentTurn] = useState<string | null>(null);
   const [hostId, setHostId] = useState<string | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
-  const [hand, setHand] = useState<string[]>([]);
-  const [remaining, setRemaining] = useState<number | null>(null);
   const [gameMode, setGameMode] = useState<"TURN_ROTATION" | "FREE_ROTATION">("TURN_ROTATION");
   const [discardMode, setDiscardMode] = useState<DiscardMode>("DISCARD_OFF");
   const [topDiscard, setTopDiscard] = useState<string | null>(null);
@@ -30,6 +28,9 @@ export default function Home() {
   const [cardsPerPlayer, setCardsPerPlayer] = useState(0);
   const [playMode, setPlayMode] = useState<PlayMode>("PLAY_OFF");
   const [playAreas, setPlayAreas] = useState<Record<string, PlayArea>>({});
+  const [hand, setHand] = useState<string[]>([]);
+  const [handCounts, setHandCounts] = useState<Record<string, number>>({});
+  const [remaining, setRemaining] = useState<number | null>(null);
   const handleGameModeChange = (next: GameMode) => {
     setGameMode(next);
     setDiscardMode((prev) => coerceDiscardMode(next, prev));
@@ -86,6 +87,10 @@ export default function Home() {
     };
   }, []);
 
+  const applyHandCount = (pid: string, handCount: number) => {
+    setHandCounts((prev) => ({ ...prev, [pid]: handCount }));
+  };
+
   const subscribeAndJoin = (resolvedSessionId: string, stompClient: Client) => {
     if (sessionId === resolvedSessionId) return;
 
@@ -107,6 +112,9 @@ export default function Home() {
           if (event.payload.cardsPerPlayer != null) {
             setCardsPerPlayer(event.payload.cardsPerPlayer);
           }
+          if (event.payload.handCounts) {
+            setHandCounts(event.payload.handCounts);
+          }
           rehydrateHand(resolvedSessionId); // dealt hands land here
         } else if (event.type === "GAME_STATE") {
           setGameStarted(event.payload.gameStarted);
@@ -119,13 +127,16 @@ export default function Home() {
           if (event.payload.cardsPerPlayer != null) {
             setCardsPerPlayer(event.payload.cardsPerPlayer);
           }
+          if (event.payload.handCounts) {
+            setHandCounts(event.payload.handCounts);
+          }
           if (event.payload.gameStarted) {
             rehydrateHand(resolvedSessionId);
           }
           if (event.payload.playMode) setPlayMode(event.payload.playMode);
           if (event.payload.playAreas) setPlayAreas(event.payload.playAreas);
         } else if (event.type === "CARDS_PER_PLAYER_CHANGED") {
-            setCardsPerPlayer(event.payload.cardsPerPlayer);
+          setCardsPerPlayer(event.payload.cardsPerPlayer);
         } else if (event.type === "DECK_COUNT_CHANGED") {
           setDeckCount(event.payload.deckCount);
         } else if (event.type === "DISCARD_MODE_CHANGED") {
@@ -137,6 +148,9 @@ export default function Home() {
             ...prev,
             [event.payload.playerId]: event.payload.playArea,
           }));
+          if (event.payload.handCount != null) {
+            applyHandCount(event.payload.playerId, event.payload.handCount);
+          }
         } else if (event.type === "CARD_DISCARDED") {
           setTopDiscard(event.payload.topDiscard);
           if (event.payload.source === "PLAY" && event.payload.playArea) {
@@ -144,6 +158,9 @@ export default function Home() {
               ...prev,
               [event.payload.playerId]: event.payload.playArea,
             }));
+          }
+          if (event.payload.source === "HAND" && event.payload.handCount != null) {
+            applyHandCount(event.payload.playerId, event.payload.handCount);
           }
         } else if (event.type === "GAME_MODE_CHANGED") {
           setGameMode(event.payload.gameMode);
@@ -154,6 +171,9 @@ export default function Home() {
           }
           if (event.payload.reshuffled) {
             setStatusMessage("Discard pile reshuffled into Draw pile");
+          }
+          if (event.payload.handCount != null) {
+            applyHandCount(event.payload.playerId, event.payload.handCount);
           }
         } else if (event.type === "TURN_CHANGED") {
           setCurrentTurn(event.payload.playerId);
@@ -332,6 +352,9 @@ export default function Home() {
     setStatusMessage(null);
     setPlayMode("PLAY_OFF");
     setPlayAreas({});
+    setHand([]);
+    setHandCounts({});
+    setRemaining(null);
 
     sessionStorage.removeItem("digitalDeck.sessionId");
     sessionStorage.removeItem("digitalDeck.displayName");
@@ -521,6 +544,7 @@ export default function Home() {
       gameMode={gameMode}
       currentTurn={currentTurn}
       hand={hand}
+      handCounts={handCounts}
       remaining={remaining}
       onDraw={drawCard}
       onLeave={leaveSession}

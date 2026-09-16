@@ -27,8 +27,8 @@ type Props = {
   onKeep: () => Promise<boolean>;
   playAreas: Record<string, PlayArea>;
   onPlay: (cards: string[], startSlot: SlotId) => Promise<boolean>;
+  handCounts: Record<string, number>;
   
- 
 };
 
 export default function SessionScreen({
@@ -48,6 +48,7 @@ export default function SessionScreen({
   statusMessage,
   onPlay,
   onKeep,
+  handCounts,
 }: Props) {
   const canDraw =
     gameMode === "FREE_ROTATION" || currentTurn === playerId;
@@ -334,12 +335,13 @@ const handlePlace = async (id: SlotId) => {
           {currentTurn === playerId && " (this is you!)"}
         </p>
       )}
-<GameTable
-  playerCount={playerCount}
-  seatPlayerIds={seatPlayerIds}
-  roster={roster}
-  handBot={myHandFan}
-/>
+      <GameTable
+        playerCount={playerCount}
+        seatPlayerIds={seatPlayerIds}
+        roster={roster}
+        handBot={myHandFan}
+        handCounts={handCounts}
+      />
       <button onClick={onLeave}>Leave session</button>
 
       <p>Cards remaining: {remaining}</p>

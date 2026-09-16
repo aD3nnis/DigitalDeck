@@ -300,4 +300,19 @@ public class DeckService {
         }
         return areas;
     }
+
+    public int handSize(String sessionId, String playerId) {
+        Long size = redisTemplate.opsForList().size("session:" + sessionId + ":hands:" + playerId);
+        return size == null ? 0 : size.intValue();
+    }
+    
+    /** Public counts only — never card identities. */
+    public Map<String, Integer> getHandCounts(String sessionId, List<String> playerIds) {
+        Map<String, Integer> counts = new HashMap<>();
+        if (playerIds == null) return counts;
+        for (String playerId : playerIds) {
+            counts.put(playerId, handSize(sessionId, playerId));
+        }
+        return counts;
+    }
 }
