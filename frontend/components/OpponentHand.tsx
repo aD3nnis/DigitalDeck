@@ -12,6 +12,7 @@ type SeatFan = {
   stepX: number;
   stepY: number;
   deg: number;
+  baseDeg?: number; // first-card tilt (fromFirst)
   src: string;
 };
 
@@ -27,14 +28,14 @@ const SEAT_FAN: Record<Exclude<SeatKey, "bottom">, SeatFan> = {
   topLeft: {
     mode: "fromFirst",
     stepX: 0.1 * 7,   // same idea as dx * STEP
-    stepY: -0.5 * 7,
+    stepY: -0.3 * 7,
     deg: (-1) * -4,   // same idea as rot * DEG
     src: `${HAND}/plyrs-top-left-right/card-back-blue-left.svg`,
   },
   topRight: {
     mode: "fromFirst",
     stepX: -0.1 * 7,
-    stepY: -0.5 * 7,
+    stepY: -0.3 * 7,
     deg: (1) * -4,
     src: `${HAND}/plyrs-top-left-right/card-back-blue-right.svg`,
   },
@@ -42,14 +43,16 @@ const SEAT_FAN: Record<Exclude<SeatKey, "bottom">, SeatFan> = {
     mode: "fromFirst",
     stepX: 0.1 * 7,
     stepY: -1.1 * 7,
-    deg: (-1) * -4,
+    deg: 4,
+    baseDeg: -8, // tweak
     src: `${HAND}/plyrs-bottom-left-right/card-back-blue-left.svg`,
   },
   right: {
     mode: "fromFirst",
     stepX: -0.1 * 7,
     stepY: -1.1 * 7,
-    deg: (1) * -4,
+    deg: -4,
+    baseDeg: 8, // mirror of left
     src: `${HAND}/plyrs-bottom-left-right/card-back-blue-right.svg`,
   },
 };
@@ -73,8 +76,9 @@ function backStyle(i: number, count: number, fan: SeatFan): CSSProperties {
   }
 
   // fromFirst: card 0 stays put; i=1,2,… stack further (your old model)
+  const angle = (fan.baseDeg ?? 0) + i * fan.deg;
   return {
-    transform: `translate(${i * fan.stepX}px, ${i * fan.stepY}px) rotate(${i * fan.deg}deg)`,
+    transform: `translate(${i * fan.stepX}px, ${i * fan.stepY}px) rotate(${angle}deg)`,
     zIndex: count - i,
   };
 }
