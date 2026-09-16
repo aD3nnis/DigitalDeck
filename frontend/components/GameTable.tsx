@@ -93,8 +93,12 @@ export default function GameTable({
     const file = layout.boards[seat];
     if (!file) return null;
     const cls = SEAT_CLASS[seat];
+    const seatNumber = order.indexOf(seat) + 1; // 1–6
     return (
       <div key={seat} className={`${styles.seat} ${styles[cls as keyof typeof styles]}`}>
+        <span className={styles.playerLabel}>
+          {name(seat, seat)} ({seatNumber})
+        </span>
         <img
           className={styles.boardImg}
           src={`${layout.folder}/${file}`}

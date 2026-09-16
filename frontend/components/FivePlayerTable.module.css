@@ -39,6 +39,17 @@
     position: relative;
   }
   
+  .playerLabel {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    white-space: nowrap;
+    font-size: 0.85rem;
+  }
+
+  
   .dealer {
     grid-area: dealer;
     width: 100%;
