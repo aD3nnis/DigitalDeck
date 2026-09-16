@@ -335,13 +335,15 @@ const handlePlace = async (id: SlotId) => {
           {currentTurn === playerId && " (this is you!)"}
         </p>
       )}
-      <GameTable
-        playerCount={playerCount}
-        seatPlayerIds={seatPlayerIds}
-        roster={roster}
-        handBot={myHandFan}
-        handCounts={handCounts}
-      />
+        <GameTable
+          playerCount={playerCount}
+          seatPlayerIds={seatPlayerIds}
+          roster={roster}
+          handBot={myHandFan}
+          handCounts={handCounts}
+          canDraw={canDraw}
+          onDraw={handleDrawDblClick}
+        />
       <button onClick={onLeave}>Leave session</button>
 
       <p>Cards remaining: {remaining}</p>

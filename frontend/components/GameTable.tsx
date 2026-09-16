@@ -1,7 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import OpponentHand from "./OpponentHand";
+import SelectablePileBoard from "./SelectablePileBoard";
 import { LAYOUTS, type SeatKey } from "./tableLayouts";
 
 import styles1 from "./OnePlayerTable.module.css";
@@ -26,6 +27,8 @@ type Props = {
   roster: Record<string, string>;
   handBot?: ReactNode;
   handCounts?: Record<string, number>;
+  canDraw?: boolean;
+  onDraw?: () => void;
 };
 
 const HAND_CLASS: Record<string, string> = {
@@ -51,7 +54,10 @@ export default function GameTable({
   roster,
   handBot,
   handCounts,
+  canDraw = false,
+  onDraw,
 }: Props) {
+  const [drawSelected, setDrawSelected] = useState(false);
   const n = Math.min(6, Math.max(1, playerCount)) as 1 | 2 | 3 | 4 | 5 | 6;
   const styles = STYLES[n];
   const layout = LAYOUTS[n];
@@ -119,11 +125,16 @@ export default function GameTable({
       {board("topRight")}
 
       <div className={styles.draw}>
-        <img
-          className={styles.pileImg}
+        <SelectablePileBoard
           src="/board-parts/dealer-boards/draw-pile-board.svg"
-          alt="Draw pile"
-          draggable={false}
+          label="Draw pile"
+          action={{
+            canUse: canDraw,
+            selected: drawSelected,
+            onSelect: () => setDrawSelected(true),
+            onDeselect: () => setDrawSelected(false),
+            onActivate: () => onDraw?.(),
+          }}
         />
       </div>
       <div className={styles.discard}>

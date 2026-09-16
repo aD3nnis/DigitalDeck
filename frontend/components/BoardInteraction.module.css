@@ -1,0 +1,26 @@
+.zone {
+    cursor: pointer;
+  }
+  
+  .zone:global(.selected) :global(.board-stroke),
+  .selected :global(.board-stroke) {
+    fill: #5ac8fa;
+  }
+  
+  /* piles sized like your current .pileImg */
+  .pileSvg {
+    display: block;
+    width: 44px;
+    height: auto;
+    pointer-events: auto;
+    user-select: none;
+  }
+  /* BoardInteraction.module.css */
+  .selected :global(#draw-board) .cls-2,
+  .selected :global(#discard-board) .cls-2 {
+    fill: #5ac8fa;
+  }
+  .pileSvg:global(.selected) :global(#draw-board) path:last-of-type,
+.pileSvg:global(.selected) :global(#discard-board) path:last-of-type {
+  fill: #5ac8fa;
+}
