@@ -1,27 +1,24 @@
 .zone {
-    cursor: pointer;
-  }
-  
-  .zone:global(.selected) :global(.board-stroke),
-  .selected :global(.board-stroke) {
-    fill: #5ac8fa;
-  }
-  
-  /* piles sized like your current .pileImg */
-  .pileSvg {
-    display: block;
-    width: 44px;
-    height: auto;
-    pointer-events: auto;
-    user-select: none;
-  }
-  /* BoardInteraction.module.css */
-  .selected :global(#draw-board) .cls-2,
-  .selected :global(#discard-board) .cls-2 {
-    fill: #5ac8fa;
-  }
-  .pileSvg:global(.selected) :global(#draw-board) path:last-of-type,
-.pileSvg:global(.selected) :global(#discard-board) path:last-of-type {
+  cursor: pointer;
+}
+
+.zone:global(.selected) :global(.board-stroke),
+.selected :global(.board-stroke) {
+  fill: #5ac8fa;
+}
+
+/* piles sized like your current .pileImg */
+.pileSvg {
+  display: block;
+  width: 44px;
+  height: auto;
+  pointer-events: auto;
+  user-select: none;
+}
+
+/* Outer board rim only — not #draw-pile-cards / #discard-pile art */
+.pileSvg:global(.selected) :global(#draw-board) :global(.cls-2),
+.pileSvg:global(.selected) :global(#discard-board) :global(.cls-2) {
   fill: #5ac8fa;
 }
 

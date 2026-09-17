@@ -11,8 +11,30 @@ type Props = {
   label?: string;
 };
 
+/** Filename without .svg — used to scope Illustrator .cls-* rules per instance. */
+function pileScopeFromSrc(src: string): string {
+  const file = src.split("/").pop() ?? "pile";
+  return file.replace(/\.svg$/i, "");
+}
+
+/**
+ * Inlined SVGs share one document, so unscoped `.cls-3 { fill }` from draw vs
+ * discard collide. Rewrite style selectors under [data-pile="…"]; leave path
+ * class names unchanged so exports stay readable.
+ */
+function scopeSvgStyles(markup: string, scope: string): string {
+  return markup.replace(
+    /<style(\s[^>]*)?>([\s\S]*?)<\/style>/gi,
+    (_match, attrs: string | undefined, css: string) => {
+      const scoped = css.replace(/\.cls-(\d+)/g, `[data-pile="${scope}"] .cls-$1`);
+      return `<style${attrs ?? ""}>${scoped}</style>`;
+    },
+  );
+}
+
 export default function SelectablePileBoard({ src, action, label }: Props) {
   const [markup, setMarkup] = useState("");
+  const scope = pileScopeFromSrc(src);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,7 +45,7 @@ export default function SelectablePileBoard({ src, action, label }: Props) {
         const inner = text
           .replace(/^[\s\S]*?<svg[^>]*>/i, "")
           .replace(/<\/svg>[\s\S]*$/i, "");
-        setMarkup(inner);
+        setMarkup(scopeSvgStyles(inner, scope));
       })
       .catch(() => {
         if (!cancelled) setMarkup("");
@@ -31,12 +53,13 @@ export default function SelectablePileBoard({ src, action, label }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [src]);
+  }, [src, scope]);
 
   const pointer = boardPointerProps(action);
 
   return (
     <svg
+      data-pile={scope}
       viewBox="0 0 44.46 44.08"
       className={`${styles.pileSvg}${pointer.className ? ` ${pointer.className}` : ""}`}
       style={pointer.style}

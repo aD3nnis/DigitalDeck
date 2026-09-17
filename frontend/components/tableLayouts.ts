@@ -24,8 +24,8 @@ export const RING: Record<number, SeatKey[]> = {
 export const ABSOLUTE: Record<number, SeatKey[]> = {
   1: ["bottom"],
   2: ["bottom", "top"],
-  3: ["bottom", "right", "left"],          // your 3p preference
-  4: ["bottom", "top", "left", "right"],   // P3/P4 swap
+  3: ["bottom", "left", "right"],          // your 3p preference
+  4: ["bottom", "left", "top", "right"],   // P3/P4 swap
   5: ["bottom", "left", "topLeft", "topRight", "right"],
   6: ["bottom", "left", "topLeft", "top", "topRight", "right"],
 };
