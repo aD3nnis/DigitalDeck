@@ -35,7 +35,7 @@ const SLOTS: SlotPaths[] = [
 
 type Props = {
     occupied: PlayArea;
-    selectedSlot: SlotId | null;
+    emptySelected: SlotId[];
     playSelected: SlotId[];
     onSelectEmpty: (id: SlotId) => void;
     onSelectOccupied: (id: SlotId) => void;
@@ -97,7 +97,7 @@ type Props = {
 
     export default function Plyr1PlayBoard({
         occupied,
-        selectedSlot,
+        emptySelected,
         playSelected,
         onSelectEmpty,
         onSelectOccupied,
@@ -124,7 +124,7 @@ type Props = {
                 key={slot.id}
                 slot={slot}
                 card={occupied[slot.id]}
-                emptySelected={selectedSlot === slot.id}
+                emptySelected={emptySelected.includes(slot.id)}
                 occupiedSelected={playSelected.includes(slot.id)}
                 onSelectEmpty={() => onSelectEmpty(slot.id)}
                 onSelectOccupied={() => onSelectOccupied(slot.id)}

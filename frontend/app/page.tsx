@@ -407,12 +407,12 @@ export default function Home() {
     return true;
   };
   
-  const playCards = async (cards: string[], startSlot: SlotId): Promise<boolean> => {
-    if (!sessionId || cards.length === 0) return false;
+  const playCards = async (cards: string[], slots: SlotId[]): Promise<boolean> => {
+    if (!sessionId || cards.length === 0 || slots.length === 0) return false;
     const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/play`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId, cards, startSlot }),
+      body: JSON.stringify({ playerId, cards, slots }),
     });
     if (!res.ok) {
       const error = await res.json();

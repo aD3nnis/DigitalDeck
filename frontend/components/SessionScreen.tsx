@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { cardSrc, discardPileSrc, visualState } from "./CardAssets";
 import Card from "./Card";
 import styles from "./SessionScreen.module.css";
-import Plyr1PlayBoard, { SLOT_IDS, type SlotId } from "./Plyr1PlayBoard";
+import { type SlotId } from "./Plyr1PlayBoard";
 import type { PlayArea } from "./types";
 import GameTable from "./GameTable";
 
@@ -27,7 +27,7 @@ type Props = {
   onDraw: () => Promise<string | null>; // return drawn card, or null on fail
   onKeep: () => Promise<boolean>;
   playAreas: Record<string, PlayArea>;
-  onPlay: (cards: string[], startSlot: SlotId) => Promise<boolean>;
+  onPlay: (cards: string[], slots: SlotId[]) => Promise<boolean>;
   handCounts: Record<string, number>;
   
 };
@@ -142,95 +142,103 @@ export default function SessionScreen({
   const turnOrderIds =
     playerOrder.length > 0 ? playerOrder : Object.keys(roster);
   const playerCount = turnOrderIds.length;
-  const [selectedSlot, setSelectedSlot] = useState<SlotId | null>(null);
 
-function runFrom(start: SlotId, n: number): SlotId[] | null {
-  const i = SLOT_IDS.indexOf(start);
-  if (i < 0 || i + n > SLOT_IDS.length) return null;
-  return SLOT_IDS.slice(i, i + n);
-}
+  const [emptySelected, setEmptySelected] = useState<SlotId[]>([]);
+  const [discardSelected, setDiscardSelected] = useState(false);
+  const [drawSelected, setDrawSelected] = useState(false);
 
-const handlePlace = async (id: SlotId) => {
-  setSelectedSlot(id);
-  if (!canPlay || selected.length === 0) return;
-  const cards = selectedCards();
-  const run = runFrom(id, cards.length);
-  if (!run) {
-    alert("not enough slots");
-    return;
-  }
-  const occupied = myPlayArea ?? {};
-  if (run.some((s) => occupied[s])) {
-    alert("slot occupied");
-    return;
-  }
-  const ok = await onPlay(cards, id);
-  if (ok) {
-    setSelected([]);
-    setSelectedSlot(null);
-  }
-};
-const [discardSelected, setDiscardSelected] = useState(false);
+  const clearPlayTargets = () => {
+    setEmptySelected([]);
+    setPlaySelected([]);
+  };
 
-const handleDiscardActivate = async () => {
-  if (!canDiscard || !discardSelected || selected.length === 0) return;
-  const ok = await onDiscard(selectedCards(), "HAND");
-  if (ok) {
-    setSelected([]);
-    setPendingCard(null);
+  const selectDraw = () => {
+    setDrawSelected(true);
     setDiscardSelected(false);
-  }
-};
+    clearPlayTargets();
+  };
+
+  const deselectDraw = () => setDrawSelected(false);
+
+  const selectDiscard = () => {
+    setDiscardSelected(true);
+    setDrawSelected(false);
+    clearPlayTargets();
+  };
+
+  const deselectDiscard = () => setDiscardSelected(false);
+
+  const selectPlayEmpty = (id: SlotId) => {
+    setDrawSelected(false);
+    setDiscardSelected(false);
+    setPlaySelected([]);
+    setEmptySelected((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
+  };
+
+  const selectPlayOccupied = (id: SlotId) => {
+    setDrawSelected(false);
+    setDiscardSelected(false);
+    setEmptySelected([]);
+    setPlaySelected((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
+  };
+
+  const handlePlace = async (id: SlotId) => {
+    const slots = emptySelected.includes(id)
+      ? emptySelected
+      : [...emptySelected, id];
+
+    if (!canPlay || selected.length === 0) return;
+    if (slots.length !== selected.length) {
+      alert(
+        `Select ${selected.length} slot(s) to match your ${selected.length} card(s)`,
+      );
+      return;
+    }
+
+    const cards = selectedCards();
+    const occupied = myPlayArea ?? {};
+    if (slots.some((s) => occupied[s])) {
+      alert("slot occupied");
+      return;
+    }
+
+    const ok = await onPlay(cards, slots);
+    if (ok) {
+      setSelected([]);
+      setEmptySelected([]);
+    }
+  };
+
+  const handleDiscardActivate = async () => {
+    if (!canDiscard || !discardSelected) return;
+    if (playSelected.length > 0) {
+      const ok = await onDiscard(selectedPlayCards(), "PLAY");
+      if (ok) setPlaySelected([]);
+      return;
+    }
+    if (selected.length === 0) return;
+    const ok = await onDiscard(selectedCards(), "HAND");
+    if (ok) {
+      setSelected([]);
+      setPendingCard(null);
+      setDiscardSelected(false);
+    }
+  };
+
   useEffect(() => {
     if (pendingCard == null) return;
     const idx = hand.lastIndexOf(pendingCard);
     if (idx !== -1) setSelected([idx]);
   }, [hand, pendingCard]);
 
-
   useEffect(() => {
     setPlaySelected([]);
+    setEmptySelected([]);
   }, [myPlayArea]);
-
-
-  const [drawSelected, setDrawSelected] = useState(false);
-
-const clearPlayTargets = () => {
-  setSelectedSlot(null);
-  setPlaySelected([]);
-};
-
-const selectDraw = () => {
-  setDrawSelected(true);
-  setDiscardSelected(false);
-  clearPlayTargets();
-};
-
-const deselectDraw = () => setDrawSelected(false);
-
-const selectDiscard = () => {
-  setDiscardSelected(true);
-  setDrawSelected(false);
-  clearPlayTargets();
-};
-
-const deselectDiscard = () => setDiscardSelected(false);
-
-const selectPlayEmpty = (id: SlotId) => {
-  setDrawSelected(false);
-  setDiscardSelected(false);
-  setPlaySelected([]);
-  setSelectedSlot(id); // A: one start slot
-};
-
-const selectPlayOccupied = (id: SlotId) => {
-  setDrawSelected(false);
-  setDiscardSelected(false);
-  setSelectedSlot(null);
-  setPlaySelected((prev) =>
-    prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
-  );
-};
 
   useEffect(() => {
     if (gameMode !== "TURN_ROTATION") return;
@@ -238,8 +246,6 @@ const selectPlayOccupied = (id: SlotId) => {
     setSelected([]);
     setPendingCard(null);
     setDiscardSelected(false);
-    setSelectedSlot(null);
-    setPlaySelected([]);
     setDrawSelected(false);
     clearPlayTargets();
   }, [currentTurn, playerId, gameMode]);
@@ -389,10 +395,8 @@ const selectPlayOccupied = (id: SlotId) => {
        
           topDiscard={topDiscard}
           myPlayArea={myPlayArea}
-          selectedSlot={selectedSlot}
+          emptySelected={emptySelected}
           playSelected={playSelected}
-
-
           canDraw={canDraw}
           drawSelected={drawSelected}
           onSelectDraw={selectDraw}

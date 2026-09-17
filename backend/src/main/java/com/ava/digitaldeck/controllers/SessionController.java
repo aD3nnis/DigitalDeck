@@ -331,8 +331,9 @@ public class SessionController {
         if (cards == null || cards.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "no cards"));
         }
-        if (request.startSlot() == null || request.startSlot().isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "no start slot"));
+        List<String> slots = request.slots();
+        if (slots == null || slots.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "no slots"));
         }
     
         TurnActionPolicy.Permit permit = turnActionPolicy.permitPlay(sessionId, request.playerId());
@@ -341,7 +342,7 @@ public class SessionController {
         }
     
         DeckService.PlayAttempt attempt =
-                deckService.playCards(sessionId, request.playerId(), cards, request.startSlot());
+                deckService.playCards(sessionId, request.playerId(), cards, slots);
         if (!attempt.ok()) {
             return ResponseEntity.badRequest().body(Map.of("error", attempt.error()));
         }
@@ -352,7 +353,7 @@ public class SessionController {
         payload.put("playerId", request.playerId());
         payload.put("cards", attempt.played());
         payload.put("playArea", playArea);
-        payload.put("startSlot", request.startSlot());
+        payload.put("slots", slots);
         payload.put("handCount", deckService.handSize(sessionId, request.playerId()));
         payload.put("handCounts", deckService.getHandCounts(sessionId, sessionService.getPlayerOrder(sessionId)));
     
@@ -364,7 +365,7 @@ public class SessionController {
         return ResponseEntity.ok(Map.of(
                 "cards", attempt.played(),
                 "playArea", playArea,
-                "startSlot", request.startSlot()
+                "slots", slots
         ));
     }
 

@@ -207,23 +207,29 @@ public class DeckService {
         public boolean ok() { return error == null; }
     }
 
-    /** Moves cards hand → slots starting at startSlot, left-to-right, wrapping t08→b01. */
-    public PlayAttempt playCards(String sessionId, String playerId, List<String> cards, String startSlot) {
+    /** Moves cards hand → given slots (same order: cards[i] → slots[i]). */
+    public PlayAttempt playCards(String sessionId, String playerId,
+            List<String> cards, List<String> slots) {
         if (cards == null || cards.isEmpty()) {
             return new PlayAttempt(List.of(), "no cards");
         }
-        int start = SLOT_IDS.indexOf(startSlot);
-        if (start < 0) {
-            return new PlayAttempt(List.of(), "invalid slot");
-        }
-        if (start + cards.size() > SLOT_IDS.size()) {
-            return new PlayAttempt(List.of(), "not enough slots");
+        if (slots == null || slots.size() != cards.size()) {
+            return new PlayAttempt(List.of(), "cards/slots mismatch");
         }
 
         String pKey = playKey(sessionId, playerId);
         Map<Object, Object> occupied = redisTemplate.opsForHash().entries(pKey);
-        for (int i = 0; i < cards.size(); i++) {
-            String slot = SLOT_IDS.get(start + i);
+
+        for (int i = 0; i < slots.size(); i++) {
+            String slot = slots.get(i);
+            if (slot == null || !SLOT_IDS.contains(slot)) {
+                return new PlayAttempt(List.of(), "invalid slot");
+            }
+            for (int j = 0; j < i; j++) {
+                if (slot.equals(slots.get(j))) {
+                    return new PlayAttempt(List.of(), "duplicate slot");
+                }
+            }
             Object existing = occupied.get(slot);
             if (existing != null && !existing.toString().isBlank()) {
                 return new PlayAttempt(List.of(), "slot occupied");
@@ -249,7 +255,7 @@ public class DeckService {
             redisTemplate.opsForList().remove(handKey, 1, card);
         }
         for (int i = 0; i < cards.size(); i++) {
-            redisTemplate.opsForHash().put(pKey, SLOT_IDS.get(start + i), cards.get(i));
+            redisTemplate.opsForHash().put(pKey, slots.get(i), cards.get(i));
         }
         redisTemplate.expire(handKey, SESSION_TTL);
         redisTemplate.expire(pKey, SESSION_TTL);

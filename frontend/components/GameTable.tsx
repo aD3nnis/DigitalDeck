@@ -14,7 +14,7 @@ import styles3 from "./ThreePlayerTable.module.css";
 import styles4 from "./FourPlayerTable.module.css";
 import styles5 from "./FivePlayerTable.module.css";
 import styles6 from "./SixPlayerTable.module.css";
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import Plyr1PlayBoard, { type SlotId } from "./Plyr1PlayBoard";
 import type { PlayArea } from "./types";
 import sessionStyles from "./SessionScreen.module.css";
@@ -44,7 +44,7 @@ type Props = {
   onDiscardActivate?: () => void;
   topDiscard?: string | null;
   myPlayArea?: PlayArea;
-  selectedSlot?: SlotId | null;
+  emptySelected?: SlotId[];
   playSelected?: SlotId[];
   onSelectEmptySlot?: (id: SlotId) => void;
   onSelectOccupiedSlot?: (id: SlotId) => void;
@@ -88,7 +88,7 @@ export default function GameTable({
   onDiscardActivate,
   topDiscard = null,
   myPlayArea,
-  selectedSlot,
+  emptySelected,
   playSelected,
   onSelectEmptySlot,
   onSelectOccupiedSlot,
@@ -221,7 +221,7 @@ export default function GameTable({
         <div className={sessionStyles.yourPlayBoard}>
           <Plyr1PlayBoard
             occupied={myPlayArea ?? {}}
-            selectedSlot={selectedSlot ?? null}
+            emptySelected={emptySelected ?? []}
             playSelected={playSelected ?? []}
             onSelectEmpty={(id) => onSelectEmptySlot?.(id)}
             onSelectOccupied={(id) => onSelectOccupiedSlot?.(id)}
