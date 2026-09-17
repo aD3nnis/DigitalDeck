@@ -15,6 +15,9 @@ import styles4 from "./FourPlayerTable.module.css";
 import styles5 from "./FivePlayerTable.module.css";
 import styles6 from "./SixPlayerTable.module.css";
 import { useEffect, useState, type ReactNode } from "react";
+import Plyr1PlayBoard, { type SlotId } from "./Plyr1PlayBoard";
+import type { PlayArea } from "./types";
+import sessionStyles from "./SessionScreen.module.css";
 
 const STYLES = {
   1: styles1,
@@ -40,6 +43,12 @@ type Props = {
   onDeselectDiscard?: () => void;
   onDiscardActivate?: () => void;
   topDiscard?: string | null;
+  myPlayArea?: PlayArea;
+  selectedSlot?: SlotId | null;
+  playSelected?: SlotId[];
+  onSelectEmptySlot?: (id: SlotId) => void;
+  onSelectOccupiedSlot?: (id: SlotId) => void;
+  onPlace?: (id: SlotId) => void;
 };
 
 
@@ -75,6 +84,12 @@ export default function GameTable({
   onDeselectDiscard,
   onDiscardActivate,
   topDiscard = null,
+  myPlayArea,
+  selectedSlot,
+  playSelected,
+  onSelectEmptySlot,
+  onSelectOccupiedSlot,
+  onPlace,
 }: Props) {
   const [drawSelected, setDrawSelected] = useState(false);
   useEffect(() => {
@@ -196,7 +211,21 @@ export default function GameTable({
 
       {board("left")}
       {board("right")}
-      {board("bottom")}
+      <div className={`${styles.seat} ${styles.bottom}`}>
+        <span className={styles.playerLabel}>
+          {name("bottom", "bottom")} ({seatNumber("bottom")})
+        </span>
+        <div className={sessionStyles.yourPlayBoard}>
+          <Plyr1PlayBoard
+            occupied={myPlayArea ?? {}}
+            selectedSlot={selectedSlot ?? null}
+            playSelected={playSelected ?? []}
+            onSelectEmpty={(id) => onSelectEmptySlot?.(id)}
+            onSelectOccupied={(id) => onSelectOccupiedSlot?.(id)}
+            onPlace={(id) => onPlace?.(id)}
+          />
+        </div>
+      </div>
 
       <div className={styles.handBot}>{handBot}</div>
     </div>

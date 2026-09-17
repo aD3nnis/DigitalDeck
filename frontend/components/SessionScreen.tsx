@@ -108,6 +108,11 @@ export default function SessionScreen({
     if (!card) return;
     setPendingCard(card);
   };
+  const togglePlaySlot = (id: SlotId) => {
+    setPlaySelected((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
+  };
 
   const keepEnabled =
     gameMode === "TURN_ROTATION" &&
@@ -212,6 +217,8 @@ const handleDiscardActivate = async () => {
     setSelected([]);
     setPendingCard(null);
     setDiscardSelected(false);
+    setSelectedSlot(null);
+    setPlaySelected([]);
     // setDrawSelected(false) once draw is lifted too
   }, [currentTurn, playerId, gameMode]);
 
@@ -365,6 +372,12 @@ const handleDiscardActivate = async () => {
           onDeselectDiscard={() => setDiscardSelected(false)}
           onDiscardActivate={handleDiscardActivate}
           topDiscard={topDiscard}
+          myPlayArea={myPlayArea}
+          selectedSlot={selectedSlot}
+          playSelected={playSelected}
+          onSelectEmptySlot={setSelectedSlot}
+          onSelectOccupiedSlot={togglePlaySlot}
+          onPlace={handlePlace}
         />
       <button onClick={onLeave}>Leave session</button>
 
