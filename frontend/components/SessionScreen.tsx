@@ -75,20 +75,6 @@ export default function SessionScreen({
   const [playSelected, setPlaySelected] = useState<SlotId[]>([]);
   const myPlayArea = playAreas[playerId];
 
-  /** Returns [you, …clockwise others]. Length = roster size. */
-  function seatsClockwiseFromMe(
-    roster: Record<string, string>,
-    me: string,
-  ): string[] {
-    const seats = Object.keys(roster);
-    const myIndex = seats.findIndex((id) => id === me);
-    if (myIndex === -1) return seats;
-    // you last in current orderedSeats → flip so you are first (bottom)
-    const after = seats.slice(myIndex + 1);
-    const before = seats.slice(0, myIndex);
-    return [me, ...after, ...before];
-  }
-
   const toggle = (i: number) => {
     setSelected((prev) => {
       const at = prev.indexOf(i);
@@ -108,11 +94,7 @@ export default function SessionScreen({
     if (!card) return;
     setPendingCard(card);
   };
-  const togglePlaySlot = (id: SlotId) => {
-    setPlaySelected((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
-    );
-  };
+
 
   const keepEnabled =
     gameMode === "TURN_ROTATION" &&
@@ -211,6 +193,45 @@ const handleDiscardActivate = async () => {
   }, [myPlayArea]);
 
 
+  const [drawSelected, setDrawSelected] = useState(false);
+
+const clearPlayTargets = () => {
+  setSelectedSlot(null);
+  setPlaySelected([]);
+};
+
+const selectDraw = () => {
+  setDrawSelected(true);
+  setDiscardSelected(false);
+  clearPlayTargets();
+};
+
+const deselectDraw = () => setDrawSelected(false);
+
+const selectDiscard = () => {
+  setDiscardSelected(true);
+  setDrawSelected(false);
+  clearPlayTargets();
+};
+
+const deselectDiscard = () => setDiscardSelected(false);
+
+const selectPlayEmpty = (id: SlotId) => {
+  setDrawSelected(false);
+  setDiscardSelected(false);
+  setPlaySelected([]);
+  setSelectedSlot(id); // A: one start slot
+};
+
+const selectPlayOccupied = (id: SlotId) => {
+  setDrawSelected(false);
+  setDiscardSelected(false);
+  setSelectedSlot(null);
+  setPlaySelected((prev) =>
+    prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+  );
+};
+
   useEffect(() => {
     if (gameMode !== "TURN_ROTATION") return;
     if (currentTurn === playerId) return;
@@ -219,7 +240,8 @@ const handleDiscardActivate = async () => {
     setDiscardSelected(false);
     setSelectedSlot(null);
     setPlaySelected([]);
-    // setDrawSelected(false) once draw is lifted too
+    setDrawSelected(false);
+    clearPlayTargets();
   }, [currentTurn, playerId, gameMode]);
 
 
@@ -364,19 +386,25 @@ const handleDiscardActivate = async () => {
           roster={roster}
           handBot={myHandFan}
           handCounts={handCounts}
-          canDraw={canDraw}
-          onDraw={handleDrawDblClick}
-          canDiscard={canDiscard}
-          discardSelected={discardSelected}
-          onSelectDiscard={() => setDiscardSelected(true)}
-          onDeselectDiscard={() => setDiscardSelected(false)}
-          onDiscardActivate={handleDiscardActivate}
+       
           topDiscard={topDiscard}
           myPlayArea={myPlayArea}
           selectedSlot={selectedSlot}
           playSelected={playSelected}
-          onSelectEmptySlot={setSelectedSlot}
-          onSelectOccupiedSlot={togglePlaySlot}
+
+
+          canDraw={canDraw}
+          drawSelected={drawSelected}
+          onSelectDraw={selectDraw}
+          onDeselectDraw={deselectDraw}
+          onDraw={handleDrawDblClick}
+          canDiscard={canDiscard}
+          discardSelected={discardSelected}
+          onSelectDiscard={selectDiscard}
+          onDeselectDiscard={deselectDiscard}
+          onDiscardActivate={handleDiscardActivate}
+          onSelectEmptySlot={selectPlayEmpty}
+          onSelectOccupiedSlot={selectPlayOccupied}
           onPlace={handlePlace}
         />
       <button onClick={onLeave}>Leave session</button>

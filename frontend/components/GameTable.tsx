@@ -49,6 +49,9 @@ type Props = {
   onSelectEmptySlot?: (id: SlotId) => void;
   onSelectOccupiedSlot?: (id: SlotId) => void;
   onPlace?: (id: SlotId) => void;
+  drawSelected?: boolean;
+  onSelectDraw?: () => void;
+  onDeselectDraw?: () => void;
 };
 
 
@@ -90,11 +93,11 @@ export default function GameTable({
   onSelectEmptySlot,
   onSelectOccupiedSlot,
   onPlace,
+  drawSelected = false,
+  onSelectDraw,
+  onDeselectDraw,
 }: Props) {
-  const [drawSelected, setDrawSelected] = useState(false);
-  useEffect(() => {
-    if (!canDraw) setDrawSelected(false);
-  }, [canDraw]);
+
 
   const n = Math.min(6, Math.max(1, playerCount)) as 1 | 2 | 3 | 4 | 5 | 6;
   const styles = STYLES[n];
@@ -167,8 +170,8 @@ export default function GameTable({
           action={{
             canUse: canDraw,
             selected: drawSelected,
-            onSelect: () => setDrawSelected(true),
-            onDeselect: () => setDrawSelected(false),
+            onSelect: () => onSelectDraw?.(),
+            onDeselect: () => onDeselectDraw?.(),
             onActivate: () => onDraw?.(),
           }}
         />
