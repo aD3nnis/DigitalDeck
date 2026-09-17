@@ -30,10 +30,23 @@ export function visualState(opts: {
   }
 
   export function playedSpotSrc(
-    seat: "plyr-bottom-center" | "plyr-top-center",
+    seat:
+      | "plyr-bottom-center"
+      | "plyr-top-center"
+      | "plyrs-bottom-left-right"
+      | "plyrs-top-left-right",
     slotId: string,
     cardId: string,
+    /** Right-seat row folders are `top-row-right` / `bottom-row-right`. */
+    side: "left" | "right" = "left",
   ): string {
-    const row = slotId.startsWith("t") ? "top-row" : "bottom-row";
-    return `/played-card-spots/${seat}/${row}/${slotId}/default_${cardId}.svg`;
+    const baseRow = slotId.startsWith("t") ? "top-row" : "bottom-row";
+    const row = side === "right" ? `${baseRow}-right` : baseRow;
+    if (seat === "plyr-bottom-center" || seat === "plyr-top-center") {
+      return `/played-card-spots/${seat}/${baseRow}/${slotId}/default_${cardId}.svg`;
+    }
+    // side seats: one warped card per row (no per-slot folders)
+    return `/played-card-spots/${seat}/${row}/default_${cardId}.svg`;
   }
+
+  

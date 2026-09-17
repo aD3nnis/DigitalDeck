@@ -32,9 +32,13 @@
     pointer-events: none;
   }
   
-  .slotFill,
+  .slotFill {
+    fill: #336857; /* or keep #3d705e if you prefer that pad */
+    pointer-events: fill;
+  }
+  
   .slotStroke {
-    fill: #3d705e;
+    fill: #153c2d; /* darker ring — not the same as fill */
     pointer-events: fill;
   }
   
@@ -198,4 +202,11 @@
   
   .opponentTrapFill {
     fill: #24483a;
+  }
+
+  .opponentPlayBoardLeft {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 132.87 / 111.62;
+    pointer-events: none;
   }

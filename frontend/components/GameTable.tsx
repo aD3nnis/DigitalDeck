@@ -7,6 +7,7 @@ import { LAYOUTS, screenPlayersBySeat, type SeatKey } from "./tableLayouts";
 import { discardPileSrc } from "./CardAssets";
 import pileStyles from "./BoardInteraction.module.css";
 import PlyrTopPlayBoard from "./PlyrTopPlayBoard";
+import PlyrLeftPlayBoard from "./PlyrLeftPlayBoard";
 
 import styles1 from "./OnePlayerTable.module.css";
 import styles2 from "./TwoPlayerTable.module.css";
@@ -18,6 +19,7 @@ import { type ReactNode } from "react";
 import Plyr1PlayBoard, { type SlotId } from "./Plyr1PlayBoard";
 import type { PlayArea } from "./types";
 import sessionStyles from "./SessionScreen.module.css";
+import PlyrRightPlayBoard from "./PlyrRightPlayBoard";
 
 const STYLES = {
   1: styles1,
@@ -176,6 +178,7 @@ export default function GameTable({
           </div>
         </div>
       )}
+
       {board("topLeft")}
       {board("topRight")}
 
@@ -228,8 +231,26 @@ export default function GameTable({
         />
       </div>
 
-      {board("left")}
-      {board("right")}
+      {layout.boards.left && (
+        <div className={`${styles.seat} ${styles.left}`}>
+          <span className={styles.playerLabel}>
+            {name("left", "left")} ({seatNumber("left")})
+          </span>
+          <div className={sessionStyles.opponentPlayBoardLeft}>
+            <PlyrLeftPlayBoard occupied={areaForSeat("left")} />
+          </div>
+        </div>
+      )}
+      {layout.boards.right && (
+        <div className={`${styles.seat} ${styles.right}`}>
+          <span className={styles.playerLabel}>
+            {name("right", "right")} ({seatNumber("right")})
+          </span>
+          <div className={sessionStyles.opponentPlayBoardLeft}>
+            <PlyrRightPlayBoard occupied={areaForSeat("right")} />
+          </div>
+        </div>
+      )}
       <div className={`${styles.seat} ${styles.bottom}`}>
         <span className={styles.playerLabel}>
           {name("bottom", "bottom")} ({seatNumber("bottom")})
