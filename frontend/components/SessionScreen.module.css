@@ -185,4 +185,17 @@
     fill: none;
   }
 
+  .opponentPlayBoard {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 177.84 / 44.34;
+    pointer-events: none;
+  }
+
+  .opponentPlayBoard .slotGroup {
+    cursor: default;
+  }
   
+  .opponentTrapFill {
+    fill: #24483a;
+  }

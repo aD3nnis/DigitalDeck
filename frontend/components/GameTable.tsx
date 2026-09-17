@@ -3,10 +3,10 @@
 
 import OpponentHand from "./OpponentHand";
 import SelectablePileBoard from "./SelectablePileBoard";
-import { LAYOUTS, screenPlayersBySeat, ABSOLUTE, type SeatKey } from "./tableLayouts";
+import { LAYOUTS, screenPlayersBySeat, type SeatKey } from "./tableLayouts";
 import { discardPileSrc } from "./CardAssets";
 import pileStyles from "./BoardInteraction.module.css";
-
+import PlyrTopPlayBoard from "./PlyrTopPlayBoard";
 
 import styles1 from "./OnePlayerTable.module.css";
 import styles2 from "./TwoPlayerTable.module.css";
@@ -52,6 +52,7 @@ type Props = {
   drawSelected?: boolean;
   onSelectDraw?: () => void;
   onDeselectDraw?: () => void;
+  playAreas?: Record<string, PlayArea>;
 };
 
 
@@ -96,6 +97,7 @@ export default function GameTable({
   drawSelected = false,
   onSelectDraw,
   onDeselectDraw,
+  playAreas,
 }: Props) {
 
 
@@ -106,6 +108,11 @@ export default function GameTable({
   const bySeat = screenPlayersBySeat(turnOrderIds, viewerId);
   
   const pidAt = (seat: SeatKey) => bySeat[seat];
+
+  const areaForSeat = (seat: SeatKey): PlayArea => {
+    const pid = pidAt(seat);
+    return pid ? playAreas?.[pid] ?? {} : {};
+  };
   
   const countForSeat = (seat: SeatKey) => {
     const pid = pidAt(seat);
@@ -159,7 +166,16 @@ export default function GameTable({
         </div>
       ))}
 
-      {board("top")}
+      {layout.boards.top && (
+        <div className={`${styles.seat} ${styles.top}`}>
+          <span className={styles.playerLabel}>
+            {name("top", "top")} ({seatNumber("top")})
+          </span>
+          <div className={sessionStyles.opponentPlayBoard}>
+            <PlyrTopPlayBoard occupied={areaForSeat("top")} />
+          </div>
+        </div>
+      )}
       {board("topLeft")}
       {board("topRight")}
 

@@ -392,9 +392,9 @@ export default function SessionScreen({
           roster={roster}
           handBot={myHandFan}
           handCounts={handCounts}
-       
-          topDiscard={topDiscard}
+          playAreas={playAreas}
           myPlayArea={myPlayArea}
+          topDiscard={topDiscard}
           emptySelected={emptySelected}
           playSelected={playSelected}
           canDraw={canDraw}
