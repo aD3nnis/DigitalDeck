@@ -183,23 +183,38 @@ const handlePlace = async (id: SlotId) => {
     setSelectedSlot(null);
   }
 };
+const [discardSelected, setDiscardSelected] = useState(false);
 
+const handleDiscardActivate = async () => {
+  if (!canDiscard || !discardSelected || selected.length === 0) return;
+  const ok = await onDiscard(selectedCards(), "HAND");
+  if (ok) {
+    setSelected([]);
+    setPendingCard(null);
+    setDiscardSelected(false);
+  }
+};
   useEffect(() => {
     if (pendingCard == null) return;
     const idx = hand.lastIndexOf(pendingCard);
     if (idx !== -1) setSelected([idx]);
   }, [hand, pendingCard]);
-  
-  useEffect(() => {
-    if (currentTurn !== playerId) {
-      setSelected([]);
-      setPendingCard(null);
-    }
-  }, [currentTurn, playerId]);
+
 
   useEffect(() => {
     setPlaySelected([]);
   }, [myPlayArea]);
+
+
+  useEffect(() => {
+    if (gameMode !== "TURN_ROTATION") return;
+    if (currentTurn === playerId) return;
+    setSelected([]);
+    setPendingCard(null);
+    setDiscardSelected(false);
+    // setDrawSelected(false) once draw is lifted too
+  }, [currentTurn, playerId, gameMode]);
+
 
   const drawDiscardSection = (
     <section style={{ display: "flex", justifyContent: "center" }}>
@@ -344,6 +359,12 @@ const handlePlace = async (id: SlotId) => {
           handCounts={handCounts}
           canDraw={canDraw}
           onDraw={handleDrawDblClick}
+          canDiscard={canDiscard}
+          discardSelected={discardSelected}
+          onSelectDiscard={() => setDiscardSelected(true)}
+          onDeselectDiscard={() => setDiscardSelected(false)}
+          onDiscardActivate={handleDiscardActivate}
+          topDiscard={topDiscard}
         />
       <button onClick={onLeave}>Leave session</button>
 

@@ -24,3 +24,17 @@
 .pileSvg:global(.selected) :global(#discard-board) path:last-of-type {
   fill: #5ac8fa;
 }
+
+.pileWrap {
+  position: relative;
+}
+
+.discardTopCard {
+  position: absolute;
+  pointer-events: none;
+  left: 7%;
+  top: 8%;
+  width: 72%;
+  height: auto;
+  z-index: 1;
+}

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+
 import OpponentHand from "./OpponentHand";
 import SelectablePileBoard from "./SelectablePileBoard";
 import { LAYOUTS, screenPlayersBySeat, ABSOLUTE, type SeatKey } from "./tableLayouts";
+import { discardPileSrc } from "./CardAssets";
+import pileStyles from "./BoardInteraction.module.css";
 
 
 import styles1 from "./OnePlayerTable.module.css";
@@ -12,6 +14,7 @@ import styles3 from "./ThreePlayerTable.module.css";
 import styles4 from "./FourPlayerTable.module.css";
 import styles5 from "./FivePlayerTable.module.css";
 import styles6 from "./SixPlayerTable.module.css";
+import { useEffect, useState, type ReactNode } from "react";
 
 const STYLES = {
   1: styles1,
@@ -31,6 +34,12 @@ type Props = {
   handCounts?: Record<string, number>;
   canDraw?: boolean;
   onDraw?: () => void;
+  canDiscard?: boolean;
+  discardSelected?: boolean;
+  onSelectDiscard?: () => void;
+  onDeselectDiscard?: () => void;
+  onDiscardActivate?: () => void;
+  topDiscard?: string | null;
 };
 
 
@@ -60,8 +69,18 @@ export default function GameTable({
   handCounts,
   canDraw = false,
   onDraw,
+  canDiscard = false,
+  discardSelected = false,
+  onSelectDiscard,
+  onDeselectDiscard,
+  onDiscardActivate,
+  topDiscard = null,
 }: Props) {
   const [drawSelected, setDrawSelected] = useState(false);
+  useEffect(() => {
+    if (!canDraw) setDrawSelected(false);
+  }, [canDraw]);
+
   const n = Math.min(6, Math.max(1, playerCount)) as 1 | 2 | 3 | 4 | 5 | 6;
   const styles = STYLES[n];
   const layout = LAYOUTS[n];
@@ -140,12 +159,27 @@ export default function GameTable({
         />
       </div>
       <div className={styles.discard}>
-        <img
-          className={styles.pileImg}
-          src="/board-parts/dealer-boards/discard-pile-board.svg"
-          alt="Discard pile"
-          draggable={false}
-        />
+        <div className={pileStyles.pileWrap}>
+          <SelectablePileBoard
+            src="/board-parts/dealer-boards/discard-pile-board.svg"
+            label="Discard pile"
+            action={{
+              canUse: canDiscard,
+              selected: discardSelected,
+              onSelect: () => onSelectDiscard?.(),
+              onDeselect: () => onDeselectDiscard?.(),
+              onActivate: () => onDiscardActivate?.(),
+            }}
+          />
+          {topDiscard && (
+            <img
+              className={pileStyles.discardTopCard}
+              src={discardPileSrc(topDiscard)}
+              alt={topDiscard}
+              draggable={false}
+            />
+          )}
+        </div>
       </div>
 
       {"handML" in styles && <div className={styles.handML} aria-hidden />}
