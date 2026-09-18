@@ -6,6 +6,7 @@
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/controllers/SessionController.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/controllers/SessionSocketController.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/model/CreateSessionRequest.java
+/Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/model/DealerDrawRequest.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/model/DiscardMode.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/model/DiscardRequest.java
 /Users/avadennis/Documents/learning-career-focused/projects/learning-java/DigitalDeck/backend/src/main/java/com/ava/digitaldeck/model/DrawRequest.java

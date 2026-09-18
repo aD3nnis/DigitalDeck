@@ -17,7 +17,8 @@ import styles5 from "./FivePlayerTable.module.css";
 import styles6 from "./SixPlayerTable.module.css";
 import { type ReactNode } from "react";
 import Plyr1PlayBoard, { type SlotId } from "./Plyr1PlayBoard";
-import type { PlayArea } from "./types";
+import DealerPlayBoard from "./DealerPlayBoard";
+import type { PlayArea, DealerArea, DealerSlotId } from "./types";
 import sessionStyles from "./SessionScreen.module.css";
 import PlyrRightPlayBoard from "./PlyrRightPlayBoard";
 import PlyrTopLeftPlayBoard from "./PlyrTopLeftPlayBoard";
@@ -57,6 +58,12 @@ type Props = {
   onSelectDraw?: () => void;
   onDeselectDraw?: () => void;
   playAreas?: Record<string, PlayArea>;
+  dealerArea?: DealerArea;
+  dealerEmptySelected?: DealerSlotId[];
+  dealerPlaySelected?: DealerSlotId[];
+  onSelectDealerEmpty?: (id: DealerSlotId) => void;
+  onSelectDealerOccupied?: (id: DealerSlotId) => void;
+  onDealerPlace?: (id: DealerSlotId) => void;
 };
 
 
@@ -102,6 +109,12 @@ export default function GameTable({
   onSelectDraw,
   onDeselectDraw,
   playAreas,
+  dealerArea,
+  dealerEmptySelected,
+  dealerPlaySelected,
+  onSelectDealerEmpty,
+  onSelectDealerOccupied,
+  onDealerPlace,
 }: Props) {
 
 
@@ -242,12 +255,16 @@ export default function GameTable({
       {"handMR" in styles && <div className={styles.handMR} aria-hidden />}
 
       <div className={`${styles.seat} ${styles.dealer}`}>
-        <img
-          className={styles.dealerImg}
-          src="/board-parts/dealer-boards/dealer-board.svg"
-          alt="Dealer board"
-          draggable={false}
-        />
+        <div className={sessionStyles.dealerPlayBoard}>
+          <DealerPlayBoard
+            occupied={dealerArea ?? {}}
+            emptySelected={dealerEmptySelected ?? []}
+            playSelected={dealerPlaySelected ?? []}
+            onSelectEmpty={(id) => onSelectDealerEmpty?.(id)}
+            onSelectOccupied={(id) => onSelectDealerOccupied?.(id)}
+            onPlace={(id) => onDealerPlace?.(id)}
+          />
+        </div>
       </div>
 
       {layout.boards.left && (

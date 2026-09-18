@@ -73,6 +73,7 @@ public class GameStartService {
         
         List<String> playerOrder = sessionService.getPlayerOrder(sessionId);
         deckService.clearAllPlayAreas(sessionId, playerOrder);
+        deckService.clearDealerArea(sessionId);
         
         deckService.dealStartingHands(
                 sessionId,

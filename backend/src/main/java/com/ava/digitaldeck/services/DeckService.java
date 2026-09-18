@@ -321,4 +321,181 @@ public class DeckService {
         }
         return counts;
     }
+
+    public static final List<String> DEALER_SLOT_IDS = List.of(
+        "d01", "d02", "d03", "d04", "d05"
+    );
+
+    private String dealerKey(String sessionId) {
+        return "session:" + sessionId + ":dealerArea";
+    }
+
+    public void clearDealerArea(String sessionId) {
+        redisTemplate.delete(dealerKey(sessionId));
+    }
+
+    /** Moves cards hand → shared dealer slots (same order: cards[i] → slots[i]). */
+    public PlayAttempt playCardsToDealer(String sessionId, String playerId,
+            List<String> cards, List<String> slots) {
+        if (cards == null || cards.isEmpty()) {
+            return new PlayAttempt(List.of(), "no cards");
+        }
+        if (slots == null || slots.size() != cards.size()) {
+            return new PlayAttempt(List.of(), "cards/slots mismatch");
+        }
+
+        String dKey = dealerKey(sessionId);
+        Map<Object, Object> occupied = redisTemplate.opsForHash().entries(dKey);
+
+        for (int i = 0; i < slots.size(); i++) {
+            String slot = slots.get(i);
+            if (slot == null || !DEALER_SLOT_IDS.contains(slot)) {
+                return new PlayAttempt(List.of(), "invalid slot");
+            }
+            for (int j = 0; j < i; j++) {
+                if (slot.equals(slots.get(j))) {
+                    return new PlayAttempt(List.of(), "duplicate slot");
+                }
+            }
+            Object existing = occupied.get(slot);
+            if (existing != null && !existing.toString().isBlank()) {
+                return new PlayAttempt(List.of(), "slot occupied");
+            }
+        }
+
+        String handKey = "session:" + sessionId + ":hands:" + playerId;
+        List<String> hand = getHand(sessionId, playerId);
+        List<String> remainingHand = new ArrayList<>(hand);
+        for (String card : cards) {
+            if (card == null || card.isBlank()) {
+                return new PlayAttempt(List.of(), "card not in hand");
+            }
+            int at = remainingHand.indexOf(card);
+            if (at < 0) {
+                return new PlayAttempt(List.of(), "card not in hand");
+            }
+            remainingHand.remove(at);
+        }
+
+        for (String card : cards) {
+            redisTemplate.opsForList().remove(handKey, 1, card);
+        }
+        for (int i = 0; i < cards.size(); i++) {
+            redisTemplate.opsForHash().put(dKey, slots.get(i), cards.get(i));
+        }
+        redisTemplate.expire(handKey, SESSION_TTL);
+        redisTemplate.expire(dKey, SESSION_TTL);
+        return new PlayAttempt(List.copyOf(cards), null);
+    }
+
+    
+    /**
+     * Draws cards from the deck directly onto dealer slots (does not touch any hand).
+     * Same order: slots[i] gets the i-th drawn card.
+     */
+    public PlayAttempt drawCardsToDealer(String sessionId, List<String> slots) {
+        if (slots == null || slots.isEmpty()) {
+            return new PlayAttempt(List.of(), "no slots");
+        }
+
+        String dKey = dealerKey(sessionId);
+        Map<Object, Object> occupied = redisTemplate.opsForHash().entries(dKey);
+
+        for (int i = 0; i < slots.size(); i++) {
+            String slot = slots.get(i);
+            if (slot == null || !DEALER_SLOT_IDS.contains(slot)) {
+                return new PlayAttempt(List.of(), "invalid slot");
+            }
+            for (int j = 0; j < i; j++) {
+                if (slot.equals(slots.get(j))) {
+                    return new PlayAttempt(List.of(), "duplicate slot");
+                }
+            }
+            Object existing = occupied.get(slot);
+            if (existing != null && !existing.toString().isBlank()) {
+                return new PlayAttempt(List.of(), "slot occupied");
+            }
+        }
+
+        String deckKey = "session:" + sessionId + ":deck";
+        List<String> drawn = new ArrayList<>();
+        for (int i = 0; i < slots.size(); i++) {
+            String card = redisTemplate.opsForList().leftPop(deckKey);
+            if (card == null) {
+                int moved = reshuffleDiscardIntoDeck(sessionId);
+                if (moved == 0) {
+                    // put back any already drawn cards onto deck (left) to avoid loss
+                    for (int k = drawn.size() - 1; k >= 0; k--) {
+                        redisTemplate.opsForList().leftPush(deckKey, drawn.get(k));
+                    }
+                    return new PlayAttempt(List.of(), "deck is empty");
+                }
+                card = redisTemplate.opsForList().leftPop(deckKey);
+                if (card == null) {
+                    for (int k = drawn.size() - 1; k >= 0; k--) {
+                        redisTemplate.opsForList().leftPush(deckKey, drawn.get(k));
+                    }
+                    return new PlayAttempt(List.of(), "deck is empty");
+                }
+            }
+            drawn.add(card);
+        }
+
+        for (int i = 0; i < slots.size(); i++) {
+            redisTemplate.opsForHash().put(dKey, slots.get(i), drawn.get(i));
+        }
+        redisTemplate.expire(dKey, SESSION_TTL);
+        redisTemplate.expire(deckKey, SESSION_TTL);
+        return new PlayAttempt(List.copyOf(drawn), null);
+    }
+
+
+    public Optional<String> discardFromDealer(String sessionId, String card) {
+        if (card == null || card.isBlank()) return Optional.empty();
+
+        String dKey = dealerKey(sessionId);
+        Map<Object, Object> occupied = redisTemplate.opsForHash().entries(dKey);
+        String slotToClear = null;
+        for (String slot : DEALER_SLOT_IDS) {
+            Object existing = occupied.get(slot);
+            if (card.equals(existing)) {
+                slotToClear = slot;
+                break;
+            }
+        }
+        if (slotToClear == null) return Optional.empty();
+
+        redisTemplate.opsForHash().delete(dKey, slotToClear);
+        String discardKey = "session:" + sessionId + ":discard";
+        redisTemplate.opsForList().rightPush(discardKey, card);
+        redisTemplate.expire(discardKey, SESSION_TTL);
+        redisTemplate.expire(dKey, SESSION_TTL);
+        return Optional.of(card);
+    }
+
+    public List<String> discardCardsFromDealer(String sessionId, List<String> cards) {
+        if (cards == null || cards.isEmpty()) return List.of();
+        List<String> discarded = new ArrayList<>();
+        for (String card : cards) {
+            Optional<String> one = discardFromDealer(sessionId, card);
+            if (one.isEmpty()) break;
+            discarded.add(one.get());
+        }
+        return discarded;
+    }
+
+    /** Occupied dealer slots only: { "d01": "AH", ... }. */
+    public Map<String, String> getDealerArea(String sessionId) {
+        Map<Object, Object> raw = redisTemplate.opsForHash().entries(dealerKey(sessionId));
+        Map<String, String> area = new LinkedHashMap<>();
+        for (String slot : DEALER_SLOT_IDS) {
+            Object card = raw.get(slot);
+            if (card != null && !card.toString().isBlank()) {
+                area.put(slot, card.toString());
+            }
+        }
+        return area;
+    }
+
+
 }

@@ -87,8 +87,10 @@ public class SessionSocketController {
         if (started) {
             gameState.put("playAreas",
                     deckService.getAllPlayAreas(sessionId, sessionService.getPlayerOrder(sessionId)));
+            gameState.put("dealerArea", deckService.getDealerArea(sessionId));
         } else {
             gameState.put("playAreas", Map.of());
+            gameState.put("dealerArea", Map.of());
         }
         if (started) {
             gameState.put("handCounts",

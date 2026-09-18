@@ -1,6 +1,8 @@
 import type { SlotId } from "./Plyr1PlayBoard";
 
 export type PlayArea = Partial<Record<SlotId, string>>;
+export type DealerSlotId = "d01" | "d02" | "d03" | "d04" | "d05";
+export type DealerArea = Partial<Record<DealerSlotId, string>>;
 export type GameMode = "TURN_ROTATION" | "FREE_ROTATION";
 export type DiscardMode = "DISCARD_OFF" | "TURN_DISCARD" | "FREE_DISCARD";
 

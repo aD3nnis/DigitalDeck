@@ -12,6 +12,7 @@ import com.ava.digitaldeck.services.LobbySettingsService;
 import com.ava.digitaldeck.services.TurnActionPolicy;
 import com.ava.digitaldeck.services.GameStartService;
 
+import com.ava.digitaldeck.model.DealerDrawRequest;
 import com.ava.digitaldeck.model.DrawRequest;
 import com.ava.digitaldeck.model.SessionEvent;
 import com.ava.digitaldeck.model.CreateSessionRequest;
@@ -204,12 +205,25 @@ public class SessionController {
         boolean advanceTurn = ((TurnActionPolicy.Permit.Allowed) permit).advanceTurnAfter();
     
         String source = request.source() == null ? "HAND" : request.source().trim().toUpperCase();
-        List<String> discarded = "PLAY".equals(source)
-                ? deckService.discardCardsFromPlay(sessionId, request.playerId(), cards)
-                : deckService.discardCards(sessionId, request.playerId(), cards);
-    
-        String notFoundError = "PLAY".equals(source) ? "card not in play" : "card not in hand";
-        String partialError = "PLAY".equals(source) ? "some cards not in play" : "some cards not in hand";
+        List<String> discarded;
+        if ("PLAY".equals(source)) {
+            discarded = deckService.discardCardsFromPlay(sessionId, request.playerId(), cards);
+        } else if ("DEALER".equals(source)) {
+            discarded = deckService.discardCardsFromDealer(sessionId, cards);
+        } else {
+            discarded = deckService.discardCards(sessionId, request.playerId(), cards);
+        }
+
+        String notFoundError = switch (source) {
+            case "PLAY" -> "card not in play";
+            case "DEALER" -> "card not on dealer board";
+            default -> "card not in hand";
+        };
+        String partialError = switch (source) {
+            case "PLAY" -> "some cards not in play";
+            case "DEALER" -> "some cards not on dealer board";
+            default -> "some cards not in hand";
+        };
     
         if (discarded.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", notFoundError));
@@ -232,6 +246,9 @@ public class SessionController {
         if ("PLAY".equals(source)) {
             payload.put("playArea", deckService.getPlayArea(sessionId, request.playerId()));
         }
+        if ("DEALER".equals(source)) {
+            payload.put("dealerArea", deckService.getDealerArea(sessionId));
+        }
         if ("HAND".equals(source)) {
             payload.put("handCount", deckService.handSize(sessionId, request.playerId()));
         }
@@ -249,6 +266,9 @@ public class SessionController {
         body.put("source", source);
         if ("PLAY".equals(source)) {
             body.put("playArea", payload.get("playArea"));
+        }
+        if ("DEALER".equals(source)) {
+            body.put("dealerArea", payload.get("dealerArea"));
         }
         return ResponseEntity.ok(body);
         
@@ -368,6 +388,55 @@ public class SessionController {
                 "slots", slots
         ));
     }
+
+    @PostMapping("/{sessionId}/dealer/draw")
+    public ResponseEntity<?> drawToDealer(@PathVariable String sessionId, @RequestBody DealerDrawRequest request) {
+        if (!sessionService.sessionExists(sessionId)) {
+            return ResponseEntity.notFound().build();
+        }
+        List<String> slots = request.slots();
+        if (slots == null || slots.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "no slots"));
+        }
+
+        TurnActionPolicy.Permit permit = turnActionPolicy.permitDraw(sessionId, request.playerId());
+        if (permit instanceof TurnActionPolicy.Permit.Denied(String error)) {
+            return ResponseEntity.status(403).body(Map.of("error", error));
+        }
+        boolean advanceTurn = ((TurnActionPolicy.Permit.Allowed) permit).advanceTurnAfter();
+
+        DeckService.PlayAttempt attempt = deckService.drawCardsToDealer(sessionId, slots);
+        if (!attempt.ok()) {
+            return ResponseEntity.badRequest().body(Map.of("error", attempt.error()));
+        }
+
+        Map<String, String> dealerArea = deckService.getDealerArea(sessionId);
+        String topDiscard = deckService.getTopDiscard(sessionId).orElse(null);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("playerId", request.playerId());
+        payload.put("cards", attempt.played());
+        payload.put("dealerArea", dealerArea);
+        payload.put("slots", slots);
+        payload.put("remaining", deckService.remainingCount(sessionId));
+        payload.put("topDiscard", topDiscard);
+
+        messagingTemplate.convertAndSend(
+                "/topic/session/" + sessionId,
+                new SessionEvent("DEALER_CARDS_PLAYED", sessionId, payload));
+
+        maybeAdvanceTurn(sessionId, advanceTurn);
+
+        return ResponseEntity.ok(Map.of(
+                "cards", attempt.played(),
+                "dealerArea", dealerArea,
+                "slots", slots,
+                "remaining", deckService.remainingCount(sessionId)
+        ));
+    }
+
+
+
 
     @PatchMapping("/{sessionId}/play-mode")
     public ResponseEntity<?> updatePlayMode(

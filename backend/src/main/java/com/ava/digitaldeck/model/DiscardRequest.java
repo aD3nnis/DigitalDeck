@@ -2,5 +2,5 @@ package com.ava.digitaldeck.model;
 
 import java.util.List;
 
-/** source: "HAND" (default) or "PLAY" */
+/** source: "HAND" (default), "PLAY", or "DEALER" */
 public record DiscardRequest(String playerId, List<String> cards, String source) {}

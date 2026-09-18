@@ -34,12 +34,16 @@ export function visualState(opts: {
       | "plyr-bottom-center"
       | "plyr-top-center"
       | "plyrs-bottom-left-right"
-      | "plyrs-top-left-right",
+      | "plyrs-top-left-right"
+      | "dealer",
     slotId: string,
     cardId: string,
     /** Right-seat row folders are `top-row-right` / `bottom-row-right`. */
     side: "left" | "right" = "left",
   ): string {
+    if (seat === "dealer") {
+      return `/played-card-spots/dealer/${slotId}/default_${cardId}.svg`;
+    }
     const baseRow = slotId.startsWith("t") ? "top-row" : "bottom-row";
     const row = side === "right" ? `${baseRow}-right` : baseRow;
     if (seat === "plyr-bottom-center" || seat === "plyr-top-center") {

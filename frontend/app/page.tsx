@@ -8,7 +8,7 @@ import SessionScreen from "../components/SessionScreen";
 import type { DiscardMode, GameMode, PlayMode } from "../components/types";
 import { coerceDiscardMode, coercePlayMode } from "../components/types";
 import { SlotId } from "@/components/Plyr1PlayBoard";
-import type { PlayArea } from "../components/types";
+import type { PlayArea, DealerArea, DealerSlotId } from "../components/types";
 
 
 export default function Home() {
@@ -29,6 +29,7 @@ export default function Home() {
   const [cardsPerPlayer, setCardsPerPlayer] = useState(0);
   const [playMode, setPlayMode] = useState<PlayMode>("PLAY_OFF");
   const [playAreas, setPlayAreas] = useState<Record<string, PlayArea>>({});
+  const [dealerArea, setDealerArea] = useState<DealerArea>({});
   const [hand, setHand] = useState<string[]>([]);
   const [handCounts, setHandCounts] = useState<Record<string, number>>({});
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -146,6 +147,7 @@ export default function Home() {
           }
           if (event.payload.playMode) setPlayMode(event.payload.playMode);
           if (event.payload.playAreas) setPlayAreas(event.payload.playAreas);
+          if (event.payload.dealerArea) setDealerArea(event.payload.dealerArea);
         } else if (event.type === "CARDS_PER_PLAYER_CHANGED") {
           setCardsPerPlayer(event.payload.cardsPerPlayer);
         } else if (event.type === "DECK_COUNT_CHANGED") {
@@ -154,6 +156,9 @@ export default function Home() {
           setDiscardMode(event.payload.discardMode);
         } else if (event.type === "PLAY_MODE_CHANGED") {
           setPlayMode(event.payload.playMode);
+        } else if (event.type === "DEALER_CARDS_PLAYED") {
+          if (event.payload.dealerArea) setDealerArea(event.payload.dealerArea);
+          if (event.payload.remaining != null) setRemaining(event.payload.remaining);
         } else if (event.type === "CARDS_PLAYED") {
           setPlayAreas((prev) => ({
             ...prev,
@@ -169,6 +174,9 @@ export default function Home() {
               ...prev,
               [event.payload.playerId]: event.payload.playArea,
             }));
+          }
+          if (event.payload.source === "DEALER" && event.payload.dealerArea) {
+            setDealerArea(event.payload.dealerArea);
           }
           if (event.payload.source === "HAND" && event.payload.handCount != null) {
             applyHandCount(event.payload.playerId, event.payload.handCount);
@@ -363,6 +371,7 @@ export default function Home() {
     setStatusMessage(null);
     setPlayMode("PLAY_OFF");
     setPlayAreas({});
+    setDealerArea({});
     setHand([]);
     setHandCounts({});
     setRemaining(null);
@@ -373,7 +382,7 @@ export default function Home() {
 
   const discardCards = async (
     cards: string[],
-    source: "HAND" | "PLAY" = "HAND"
+    source: "HAND" | "PLAY" | "DEALER" = "HAND"
   ): Promise<boolean> => {
     if (!sessionId || cards.length === 0) return false;
   
@@ -401,6 +410,8 @@ export default function Home() {
         }
         return next;
       });
+    } else if (source === "DEALER" && body.dealerArea) {
+      setDealerArea(body.dealerArea);
     } else if (body.playArea) {
       setPlayAreas((prev) => ({ ...prev, [playerId]: body.playArea }));
     }
@@ -431,6 +442,25 @@ export default function Home() {
     setPlayAreas((prev) => ({ ...prev, [playerId]: playArea }));
     return true;
   };
+
+  const drawToDealer = async (slots: DealerSlotId[]): Promise<boolean> => {
+    if (!sessionId || slots.length === 0) return false;
+    const res = await fetch(`http://localhost:8080/api/sessions/${sessionId}/dealer/draw`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId, slots }),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      alert(error.error ?? "Could not draw to dealer");
+      return false;
+    }
+    const body = await res.json();
+    setDealerArea(body.dealerArea);
+    if (body.remaining != null) setRemaining(body.remaining);
+    return true;
+  };
+
 
   const updateDiscardMode = async (next: DiscardMode) => {
     if (!sessionId) return;
@@ -566,6 +596,8 @@ export default function Home() {
       topDiscard={topDiscard}
       onDiscard={discardCards}
       onPlay={playCards}
+      dealerArea={dealerArea}
+      onDealerDraw={drawToDealer}
       statusMessage={statusMessage}
       onKeep={keepCard}
     />

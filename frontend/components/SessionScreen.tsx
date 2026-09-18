@@ -6,7 +6,7 @@ import { cardSrc, discardPileSrc, visualState } from "./CardAssets";
 import Card from "./Card";
 import styles from "./SessionScreen.module.css";
 import { type SlotId } from "./Plyr1PlayBoard";
-import type { PlayArea } from "./types";
+import type { PlayArea, DealerArea, DealerSlotId } from "./types";
 import GameTable from "./GameTable";
 
 
@@ -22,12 +22,14 @@ type Props = {
   playMode: PlayMode;
   topDiscard: string | null;
   onLeave: () => void;
-  onDiscard: (cards: string[], source: "HAND" | "PLAY") => Promise<boolean>;
+  onDiscard: (cards: string[], source: "HAND" | "PLAY" | "DEALER") => Promise<boolean>;
   statusMessage: string | null;
   onDraw: () => Promise<string | null>; // return drawn card, or null on fail
   onKeep: () => Promise<boolean>;
   playAreas: Record<string, PlayArea>;
   onPlay: (cards: string[], slots: SlotId[]) => Promise<boolean>;
+  dealerArea: DealerArea;
+  onDealerDraw: (slots: DealerSlotId[]) => Promise<boolean>;
   handCounts: Record<string, number>;
   
 };
@@ -51,6 +53,8 @@ export default function SessionScreen({
   onPlay,
   onKeep,
   handCounts,
+  dealerArea,
+  onDealerDraw,
 }: Props) {
   const canDraw =
     gameMode === "FREE_ROTATION" || currentTurn === playerId;
@@ -146,45 +150,104 @@ export default function SessionScreen({
   const [emptySelected, setEmptySelected] = useState<SlotId[]>([]);
   const [discardSelected, setDiscardSelected] = useState(false);
   const [drawSelected, setDrawSelected] = useState(false);
+  const [dealerEmptySelected, setDealerEmptySelected] = useState<DealerSlotId[]>([]);
+  const [dealerPlaySelected, setDealerPlaySelected] = useState<DealerSlotId[]>([]);
 
   const clearPlayTargets = () => {
     setEmptySelected([]);
     setPlaySelected([]);
+    setDealerEmptySelected([]);
+    setDealerPlaySelected([]);
   };
 
   const selectDraw = () => {
     setDrawSelected(true);
     setDiscardSelected(false);
-    clearPlayTargets();
+    setEmptySelected([]);
+    setPlaySelected([]);
+    setDealerPlaySelected([]);
+    // keep dealerEmptySelected — draw + empty dealer slots can be selected together
   };
 
   const deselectDraw = () => setDrawSelected(false);
-
-  const selectDiscard = () => {
-    setDiscardSelected(true);
-    setDrawSelected(false);
-    clearPlayTargets();
-  };
-
   const deselectDiscard = () => setDiscardSelected(false);
 
-  const selectPlayEmpty = (id: SlotId) => {
-    setDrawSelected(false);
-    setDiscardSelected(false);
-    setPlaySelected([]);
-    setEmptySelected((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
-    );
+const selectDiscard = () => {
+  setDiscardSelected(true);
+  setDrawSelected(false);
+  setEmptySelected([]); // occupied play slots can stay selected
+  setDealerEmptySelected([]); // empty dealer slots cannot share discard
+};
+
+const selectPlayEmpty = (id: SlotId) => {
+  setDrawSelected(false);
+  setDiscardSelected(false); // empty slots cannot share discard
+  setPlaySelected([]);
+  setDealerEmptySelected([]);
+  setDealerPlaySelected([]);
+  setEmptySelected((prev) =>
+    prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+  );
+};
+
+const selectPlayOccupied = (id: SlotId) => {
+  setDrawSelected(false);
+  // keep discardSelected — occupied + discard can be selected together
+  setEmptySelected([]);
+  setDealerEmptySelected([]);
+  setDealerPlaySelected([]);
+  setPlaySelected((prev) =>
+    prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+  );
+};
+
+const selectDealerEmpty = (id: DealerSlotId) => {
+  // keep drawSelected — draw pile + empty dealer slots can be selected together
+  setDiscardSelected(false);
+  setPlaySelected([]);
+  setEmptySelected([]);
+  setDealerPlaySelected([]);
+  setDealerEmptySelected((prev) =>
+    prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+  );
+};
+
+const selectDealerOccupied = (id: DealerSlotId) => {
+  setDrawSelected(false);
+  // keep discardSelected — occupied dealer + discard can be selected together
+  setEmptySelected([]);
+  setDealerEmptySelected([]);
+  setPlaySelected([]);
+  setDealerPlaySelected((prev) =>
+    prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+  );
+};
+
+  const selectedDealerCards = () =>
+    dealerPlaySelected
+      .map((s) => (dealerArea ?? {})[s])
+      .filter(Boolean) as string[];
+
+  const handleDealerPlace = async (id: DealerSlotId) => {
+    const slots = dealerEmptySelected.includes(id)
+      ? dealerEmptySelected
+      : [...dealerEmptySelected, id];
+
+    if (!canDraw || !drawSelected) return;
+    if (slots.length === 0) return;
+    if (slots.some((s) => dealerArea[s])) {
+      alert("slot occupied");
+      return;
+    }
+
+    const ok = await onDealerDraw(slots);
+    if (ok) {
+      setDealerEmptySelected([]);
+      setDrawSelected(false);
+    }
   };
 
-  const selectPlayOccupied = (id: SlotId) => {
-    setDrawSelected(false);
-    setDiscardSelected(false);
-    setEmptySelected([]);
-    setPlaySelected((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
-    );
-  };
+
 
   const handlePlace = async (id: SlotId) => {
     const slots = emptySelected.includes(id)
@@ -215,9 +278,20 @@ export default function SessionScreen({
 
   const handleDiscardActivate = async () => {
     if (!canDiscard || !discardSelected) return;
+    if (dealerPlaySelected.length > 0) {
+      const ok = await onDiscard(selectedDealerCards(), "DEALER");
+      if (ok) {
+        setDealerPlaySelected([]);
+        setDiscardSelected(false);
+      }
+      return;
+    }
     if (playSelected.length > 0) {
       const ok = await onDiscard(selectedPlayCards(), "PLAY");
-      if (ok) setPlaySelected([]);
+      if (ok) {
+        setPlaySelected([]);
+        setDiscardSelected(false);
+      }
       return;
     }
     if (selected.length === 0) return;
@@ -239,6 +313,11 @@ export default function SessionScreen({
     setPlaySelected([]);
     setEmptySelected([]);
   }, [myPlayArea]);
+
+  useEffect(() => {
+    setDealerPlaySelected([]);
+    setDealerEmptySelected([]);
+  }, [dealerArea]);
 
   useEffect(() => {
     if (gameMode !== "TURN_ROTATION") return;
@@ -410,6 +489,12 @@ export default function SessionScreen({
           onSelectEmptySlot={selectPlayEmpty}
           onSelectOccupiedSlot={selectPlayOccupied}
           onPlace={handlePlace}
+          dealerArea={dealerArea}
+          dealerEmptySelected={dealerEmptySelected}
+          dealerPlaySelected={dealerPlaySelected}
+          onSelectDealerEmpty={selectDealerEmpty}
+          onSelectDealerOccupied={selectDealerOccupied}
+          onDealerPlace={handleDealerPlace}
         />
       <button onClick={onLeave}>Leave session</button>
 
