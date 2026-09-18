@@ -48,30 +48,59 @@
     white-space: nowrap;
     font-size: 0.85rem;
   }
+  .top .playerLabel {
+    top: -1.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .left .playerLabel {
+    top: 98%;
+    right: 20px;
+  }
+  
+  .right .playerLabel {
+    top: 98%;
+    right: 20px;
+  }
+  .bottom .playerLabel {
+    top: 98%;
+  }
+  .topLeft .playerLabel {
+    top: 90%;
+    left: 40px;
+  }
+  .topRight .playerLabel {
+    top: 90%;
+    right: 40px;
+  }
 
   
   .dealer {
     grid-area: dealer;
     width: 100%;
     max-width: 280px;
-    margin-top: 5px;
+    margin-top: 10px;
   }
   
   .left {
     grid-area: left;
     z-index: 1;
     width: 100%;
+    margin-top: 15px;
   }
   
   .right {
     grid-area: right;
     z-index: 1;
     width: 100%;
+    margin-top: 15px;
   }
   
   .bottom {
     grid-area: bottom;
     width: 93%;
+    margin-top: 30px;
   }
   
   /* Boards spill into pile columns — row 2 after hand strip */
@@ -162,6 +191,7 @@
     width: 100%;
     height: 100%;
     margin-right: 20px;
+    margin-top: 15px;
   }
   
   .handR {
@@ -171,6 +201,7 @@
     width: 100%;
     height: 100%;
     margin-left: 20px;
+    margin-top: 15px;
   }
   
   .boardImg,
@@ -189,14 +220,6 @@
     height: auto;
     pointer-events: auto;
     user-select: none;
-  }
-  
-  .topLeft .boardImg,
-  .topRight .boardImg {
-    width: calc(var(--table-w) * 135 / 350);
-    height: auto;
-    max-height: 100%;
-    object-fit: contain;
   }
   
   .handTL,

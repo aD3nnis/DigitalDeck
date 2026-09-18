@@ -47,6 +47,17 @@
     white-space: nowrap;
     font-size: 0.85rem;
   }
+  .top .playerLabel {
+    top: -1.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .handTop {
+    margin-bottom: 20px;
+  }
+  .bottom .playerLabel {
+    top: 98%;
+  }
   
   .top {
     grid-area: top;
@@ -58,12 +69,13 @@
     grid-area: dealer;
     width: 100%;
     max-width: 280px;
-    margin-top: 5px;
+    margin-top: 10px;
   }
   
   .bottom {
     grid-area: bottom;
     width: 93%;
+    margin-top: 30px;
   }
   
   .draw {

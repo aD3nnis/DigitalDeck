@@ -210,3 +210,10 @@
     aspect-ratio: 132.87 / 111.62;
     pointer-events: none;
   }
+
+  .opponentPlayBoardCorner {
+    position: relative;
+    width: 134px;
+    aspect-ratio: 134.86 / 75.53;
+    pointer-events: none;
+  }

@@ -50,12 +50,13 @@
     grid-area: dealer;
     width: 100%;
     max-width: 280px;
-    margin-top: 5px;
+    margin-top: 10px;
   }
   
   .bottom {
     grid-area: bottom;
     width: 93%;
+    margin-top: 30px;
   }
   
   .draw {

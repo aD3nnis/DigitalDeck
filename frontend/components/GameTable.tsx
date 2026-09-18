@@ -20,6 +20,8 @@ import Plyr1PlayBoard, { type SlotId } from "./Plyr1PlayBoard";
 import type { PlayArea } from "./types";
 import sessionStyles from "./SessionScreen.module.css";
 import PlyrRightPlayBoard from "./PlyrRightPlayBoard";
+import PlyrTopLeftPlayBoard from "./PlyrTopLeftPlayBoard";
+import PlyrTopRightPlayBoard from "./PlyrTopRightPlayBoard";
 
 const STYLES = {
   1: styles1,
@@ -171,7 +173,7 @@ export default function GameTable({
       {layout.boards.top && (
         <div className={`${styles.seat} ${styles.top}`}>
           <span className={styles.playerLabel}>
-            {name("top", "top")} ({seatNumber("top")})
+            {name("top", "top")}
           </span>
           <div className={sessionStyles.opponentPlayBoard}>
             <PlyrTopPlayBoard occupied={areaForSeat("top")} />
@@ -179,9 +181,26 @@ export default function GameTable({
         </div>
       )}
 
-      {board("topLeft")}
-      {board("topRight")}
-
+      {layout.boards.topLeft && (
+        <div className={`${styles.seat} ${styles.topLeft}`}>
+          <span className={styles.playerLabel}>
+            {name("topLeft", "topLeft")}
+          </span>
+          <div className={sessionStyles.opponentPlayBoardCorner}>
+            <PlyrTopLeftPlayBoard occupied={areaForSeat("topLeft")} />
+          </div>
+        </div>
+      )}
+      {layout.boards.topRight && (
+        <div className={`${styles.seat} ${styles.topRight}`}>
+          <span className={styles.playerLabel}>
+            {name("topRight", "topRight")}
+          </span>
+          <div className={sessionStyles.opponentPlayBoardCorner}>
+            <PlyrTopRightPlayBoard occupied={areaForSeat("topRight")} />
+          </div>
+        </div>
+      )}
       <div className={styles.draw}>
         <SelectablePileBoard
           src="/board-parts/dealer-boards/draw-pile-board.svg"
@@ -234,7 +253,7 @@ export default function GameTable({
       {layout.boards.left && (
         <div className={`${styles.seat} ${styles.left}`}>
           <span className={styles.playerLabel}>
-            {name("left", "left")} ({seatNumber("left")})
+            {name("left", "left")}
           </span>
           <div className={sessionStyles.opponentPlayBoardLeft}>
             <PlyrLeftPlayBoard occupied={areaForSeat("left")} />
@@ -244,7 +263,7 @@ export default function GameTable({
       {layout.boards.right && (
         <div className={`${styles.seat} ${styles.right}`}>
           <span className={styles.playerLabel}>
-            {name("right", "right")} ({seatNumber("right")})
+            {name("right", "right")}
           </span>
           <div className={sessionStyles.opponentPlayBoardLeft}>
             <PlyrRightPlayBoard occupied={areaForSeat("right")} />
@@ -253,7 +272,7 @@ export default function GameTable({
       )}
       <div className={`${styles.seat} ${styles.bottom}`}>
         <span className={styles.playerLabel}>
-          {name("bottom", "bottom")} ({seatNumber("bottom")})
+          {name("bottom", "bottom")}
         </span>
         <div className={sessionStyles.yourPlayBoard}>
           <Plyr1PlayBoard
