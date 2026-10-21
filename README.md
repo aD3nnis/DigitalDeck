@@ -2,7 +2,32 @@
 
 A full-stack multiplayer app that simulates a shared physical card deck online. Players create or join a session with a short code, then draw, discard, and play from a server-authoritative deck in real time — so no client can peek at the shuffle or another player's hand.
 
-Built as a hands-on project to practice the Java / Spring Boot / React / Redis / PostgreSQL stack.
+Built as a hands-on project to practice the Java / Spring Boot / React / Redis / PostgreSQL stack. Project overview on my portfolio: [Digital Deck showcase](https://avadennisportfolio.netlify.app/digitaldeck/showcase).
+
+---
+
+## Project phases
+
+v1 is the finished first version of DigitalDeck. It is being built in two phases: **Phase 1 + Phase 2 = v1**.
+
+### Phase 1 — Core game, hand-built (complete, Oct 2026)
+
+The idea works end to end locally: 1–6 players share a server-authoritative deck, each seeing the table from their own seat, with draw, discard, play, and turn rotation enforced by the server.
+
+Built with AI in **ask mode only** — Cursor and Claude explained, sketched, and debugged; I wrote every change. The phase 1 code is preserved at the [`v1-phase1`](https://github.com/aD3nnis/DigitalDeck/tree/v1-phase1) tag ([release notes](https://github.com/aD3nnis/DigitalDeck/releases/tag/v1-phase1)), and [`ai-conversations/`](ai-conversations/) (#1–#92) is its decision log. See [How phase 1 was built](#how-phase-1-was-built-not-vibe-coding) below.
+
+### Phase 2 — Finishing v1 with Claude Code (started Oct 21, 2026)
+
+**Why the switch.** In the year since I left my last company, its stance on AI went from not allowed to developers being encouraged to use it as heavily as possible. That shift is happening across the industry, and I'd rather build the skills the job now requires than pretend it isn't changing.
+
+Leaning into AI doesn't mean skipping the fundamentals. Phase 1 was built by hand so I understood every layer of this app, and alongside it I've been studying John Ousterhout's *A Philosophy of Software Design*, along with [AI-written notes I've been working through on how its ideas shift when AI writes most of the code](https://avadennisportfolio.netlify.app/aichats/design-philosophy/). In that world the engineer's job moves to deciding what to build, designing the interfaces, writing the tests that define "correct," and reviewing for complexity. Phase 2 is practice at that job: I frame and design, Claude Code implements, and I review every change.
+
+**Phase 2 scope (v1 is done when these are):**
+
+1. **Groundwork** — a root `CLAUDE.md` with project decisions and conventions, backend tests that capture the game rules, and consolidating the six seat-specific play-board components into one pattern
+2. **Polish** — e.g. an error when joining a session without a name
+3. **Cypress multiplayer e2e tests**
+4. **A deployed, playable remote build**
 
 ---
 
@@ -25,7 +50,7 @@ Built as a hands-on project to practice the Java / Spring Boot / React / Redis /
 
 ---
 
-## What works today
+## What phase 1 delivered
 
 ### Sessions & lobby
 
@@ -59,15 +84,15 @@ Built as a hands-on project to practice the Java / Spring Boot / React / Redis /
 
 ---
 
-## How this project was built (not vibe coding)
+## How phase 1 was built (not vibe coding)
 
-I use AI (Cursor and Claude) as a **thinking partner**, not as an autopilot that writes and lands the code for me.
+In phase 1 I used AI (Cursor and Claude) as a **thinking partner**, not as an autopilot that writes and lands the code for me.
 
-- Agents stay in **ask mode** — they explain options, sketch designs, and help debug; they do **not** edit the codebase.
-- I make every file and code change myself, so I have to understand the APIs, Redis keys, WebSocket contract, and edge cases enough to type them in.
+- Agents stayed in **ask mode** — they explained options, sketched designs, and helped debug; they did **not** edit the codebase.
+- I made every file and code change myself, so I had to understand the APIs, Redis keys, WebSocket contract, and edge cases enough to type them in.
 - The [`ai-conversations/`](ai-conversations/) folder is a running log of those sessions (brainstorms, step-by-step build notes, bug hunts). It shows the decision trail behind the app, not a dump of generated PRs.
 
-That keeps the project hands-on: AI accelerates research and architecture talk; ownership of plugging in the code and verifying its contents stays with me.
+That kept the project hands-on: AI accelerated research and architecture talk; ownership of plugging in the code and verifying its contents stayed with me. That understanding is what makes phase 2 possible — I can only review Claude Code's changes well because I built the system they change.
 
 ---
 
@@ -130,21 +155,19 @@ REST handles session create/resolve, lobby settings, deck init, draw, discard, p
 
 ## Roadmap (learning targets)
 
-**In progress / started**
+**Phase 2 (v1)** — see [Phase 2 scope](#phase-2--finishing-v1-with-claude-code-started-oct-21-2026) above for order
 
-- Broader backend tests beyond `TurnActionPolicy` (JUnit / Mockito)
-
-**Next**
-
+- Root `CLAUDE.md`, broader backend tests beyond `TurnActionPolicy` (JUnit / Mockito), one shared play-board pattern
+- Product polish (e.g. empty-name join error)
+- **Cypress** for multi-player e2e
 - Deploy a playable remote build (env-based API/WS URLs, CORS/WSS)
+
+**After v1**
+
 - Containerize the Spring Boot app; IaC with **Terraform** on **AWS**
-- **Cypress** (or similar) for multi-player e2e
-
-**Later**
-
 - Deeper **PostgreSQL** usage (history / accounts)
 - Optional learning modules: **GraphQL**, **DynamoDB**, **GitHub Actions** CI/CD
-- Product polish (e.g. empty-name join error, optional dealer on/off lobby toggle)
+- Optional dealer on/off lobby toggle
 
 ---
 
