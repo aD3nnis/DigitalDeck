@@ -10,6 +10,10 @@ We are in **Phase 2** (see README "Project phases"). v1 is done when the Phase 2
 - After a feature works, say what you would restructure now that it exists, before starting the next thing.
 - Commits use Ava's git identity only. No `Co-Authored-By: Claude` trailer. Don't push; Ava pushes.
 
+## Game rules
+
+`docs/GAME_RULES.md` defines correct game behavior and is owned by Ava. Tests check it; when code and that file disagree, the file wins. Don't decide its ❓ open questions yourself — raise them.
+
 ## Non-negotiables
 
 - **The server is authoritative.** Clients never hold, compute, or validate game state. Game rules never go in the frontend.
